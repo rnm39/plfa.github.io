@@ -244,12 +244,14 @@ Give an example of a preorder that is not a partial order.
 
 ```agda
 -- Your code goes here
+-- (n1, m2) ≤ (n2, m2) := n1 ≤ n2 where (n1 m1 n2 m2 : ℕ)
 ```
 
 Give an example of a partial order that is not a total order.
 
 ```agda
 -- Your code goes here
+-- a ≤ b := a ⊆ b where (a b ⊆ ℕ)
 ```
 
 ## Reflexivity
@@ -363,6 +365,7 @@ argument is `s≤s`.  Why is it ok to omit them?
 
 ```agda
 -- Your code goes here
+-- 片方が`s≤s`なら`n`も`m`も`suc _`になるが、もう片方が`z≤s`なら`n`か`m`が`zero`にならなけらばならず矛盾するから。
 ```
 
 
@@ -553,6 +556,18 @@ Show that multiplication is monotonic with regard to inequality.
 
 ```agda
 -- Your code goes here
+open Data.Nat using (_*_)
+open Data.Nat.Properties using (*-comm)
+
+*-monoˡ-≤ : ∀ (m n p : ℕ) → m ≤ n → m * p ≤ n * p
+*-monoˡ-≤ zero n p z≤n = z≤n
+*-monoˡ-≤ (suc m) (suc n) p (s≤s m≤n) = +-monoʳ-≤ p (m * p) (n * p) (*-monoˡ-≤ m n p m≤n)
+
+*-monoʳ-≤ : ∀ (m n p : ℕ) → m ≤ n → p * m ≤ p * n
+*-monoʳ-≤ m n p m≤n rewrite *-comm p m | *-comm p n = *-monoˡ-≤ m n p m≤n
+
+*-mono-≤ : ∀ (m n p q : ℕ) → m ≤ n → p ≤ q → m * p ≤ n * q
+*-mono-≤ m n p q m≤n p≤q = ≤-trans (*-monoˡ-≤ m n p m≤n) (*-monoʳ-≤ p q n p≤q)
 ```
 
 
@@ -601,6 +616,10 @@ exercise exploits the relation between < and ≤.)
 
 ```agda
 -- Your code goes here
+<-trans : ∀ {m n p : ℕ} → m < n → n < p → m < p
+<-trans {zero} {suc n} {.(suc _)} z<s (s<s n<p) = z<s
+<-trans (s<s m<n) (s<s n<p) = s<s (<-trans m<n n<p)
+
 ```
 
 #### Exercise `trichotomy` (practice) {#trichotomy}
@@ -619,6 +638,24 @@ similar to that used for totality.
 
 ```agda
 -- Your code goes here
+infix 4 _>_
+
+_>_ : ℕ → ℕ → Set
+m > n = n < m
+
+data Trichotomy (m n : ℕ) : Set where
+  lt : m < n → Trichotomy m n
+  eq : m ≡ n → Trichotomy m n
+  gt : m > n → Trichotomy m n
+
+<-trichotomy : ∀ (m n : ℕ) → Trichotomy m n
+<-trichotomy zero zero = eq refl
+<-trichotomy zero (suc n) = lt z<s
+<-trichotomy (suc m) zero = gt z<s
+<-trichotomy (suc m) (suc n) with <-trichotomy m n
+...| lt m<n = lt (s<s m<n)
+...| eq m≡n = eq (cong suc m≡n)
+...| gt m>n = gt (s<s m>n)
 ```
 
 #### Exercise `+-mono-<` (practice) {#plus-mono-less}
@@ -628,6 +665,15 @@ As with inequality, some additional definitions may be required.
 
 ```agda
 -- Your code goes here
++-monoʳ-< : ∀ (m n p : ℕ) → m < n → p + m < p + n
++-monoʳ-< m n zero m<n = m<n
++-monoʳ-< m n (suc p) m<n = s<s (+-monoʳ-< m n p m<n)
+
++-monoˡ-< : ∀ (m n p : ℕ) → m < n → m + p < n + p
++-monoˡ-< m n p m<n rewrite +-comm m p | +-comm n p = +-monoʳ-< m n p m<n
+
++-mono-< : ∀ (m n p q : ℕ) → m < n → p < q → m + p < n + q
++-mono-< m n p q m<n p<q = <-trans (+-monoˡ-< m n p m<n) (+-monoʳ-< p q n p<q)
 ```
 
 #### Exercise `≤→<, <→≤` (recommended) {#leq-iff-less}
@@ -636,6 +682,13 @@ Show that `suc m ≤ n` implies `m < n`, and conversely.
 
 ```agda
 -- Your code goes here
+s≤→< : ∀ {m n : ℕ} → suc m ≤ n → m < n
+s≤→< {zero} (s≤s 0≤n) = z<s
+s≤→< {suc m} (s≤s sm≤n) = s<s (s≤→< sm≤n)
+
+<→s≤ : ∀ {m n : ℕ} → m < n → suc m ≤ n
+<→s≤ z<s = s≤s z≤n
+<→s≤ (s<s m<n) = s≤s (<→s≤ m<n)
 ```
 
 #### Exercise `<-trans-revisited` (practice) {#less-trans-revisited}
@@ -646,6 +699,12 @@ the fact that inequality is transitive.
 
 ```agda
 -- Your code goes here
+≤-suc : ∀ (n : ℕ) → n ≤ suc n
+≤-suc zero = z≤n
+≤-suc (suc n) = s≤s (≤-suc n)
+
+<-trans-revisited : ∀ (m n p : ℕ) → m < n → n < p → m < p
+<-trans-revisited m n p m<n n<p = s≤→< (≤-trans (<→s≤ m<n) (≤-trans (≤-suc n) (<→s≤ n<p)))
 ```
 
 
@@ -753,6 +812,8 @@ Show that the sum of two odd numbers is even.
 
 ```agda
 -- Your code goes here
+o+o≡e : ∀ {m n : ℕ} → odd m → odd n → even (m + n)
+o+o≡e {suc m} {n} (suc em) on rewrite +-comm m n = suc (o+e≡o on em)
 ```
 
 #### Exercise `Bin-predicates` (stretch) {#Bin-predicates}
@@ -806,6 +867,60 @@ if `One b` then `1` is less or equal to the result of `from b`.)
 
 ```agda
 -- Your code goes here
+open import plfa.part1.Induction using (Bin; ⟨⟩; _I; _O; inc; from; to; from-to)
+open import Data.Nat.Properties using (+-identityʳ; +-suc)
+open Eq using (sym)
+open Eq.≡-Reasoning using (begin_; _≡⟨⟩_; step-≡; _∎)
+
+data One : Bin → Set where
+  ⟨⟩I : One (⟨⟩ I)
+  _O : ∀ {b : Bin} → One b → One (b O)
+  _I : ∀ {b : Bin} → One b → One (b I)
+
+data Can : Bin → Set where
+  zero : Can ⟨⟩
+  one : ∀ {b : Bin} → One b → Can b
+
+One-inc : ∀ {b : Bin} → One b → One (inc b)
+One-inc ⟨⟩I = ⟨⟩I O
+One-inc (o O) = o I
+One-inc (o I) = One-inc o O
+
+Can-inc : ∀ {b : Bin} → Can b → Can (inc b)
+Can-inc zero = one ⟨⟩I
+Can-inc (one o) = one (One-inc o)
+
+One-to : ∀ (n : ℕ) → One (to (suc n))
+One-to zero = ⟨⟩I
+One-to (suc n) = One-inc (One-to n)
+
+Can-to : ∀ (n : ℕ) → Can (to n)
+Can-to zero = zero
+Can-to (suc n) = one (One-to n)
+
+0<from : ∀ (b : Bin) → One b → 0 < from b
+0<from (⟨⟩ I) ⟨⟩I = z<s
+0<from (b O) (o O) rewrite +-identityʳ (from b) =
+  +-mono-< zero (from b) zero (from b) (0<from b o) (0<from b o)
+0<from (b I) (o I) = z<s
+
+helper1 : ∀ (n : ℕ) → to (suc n + suc n) ≡ (to (suc n)) O
+helper1 zero = refl
+helper1 (suc n) rewrite +-suc n (suc n) | helper1 n = refl
+
+helper2 : ∀ (n : ℕ) → 0 < n → to (n + n) ≡ (to n) O
+helper2 (suc n) z<s = helper1 n
+
+to-from-One : ∀ (b : Bin) → One b → to (from b) ≡ b
+to-from-One (⟨⟩ I) ⟨⟩I = refl
+to-from-One (b O) (o O) rewrite
+  +-identityʳ (from b) | helper2 (from b) (0<from b o) | to-from-One b o = refl
+to-from-One (b I) (o I) rewrite
+  +-identityʳ (from b) | helper2 (from b) (0<from b o) | to-from-One b o = refl
+
+to-from : ∀ {b : Bin} → Can b → to (from b) ≡ b
+to-from zero = refl
+to-from (one o) = to-from-One _ o
 ```
 
 ## Standard library
