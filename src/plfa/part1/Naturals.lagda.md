@@ -79,6 +79,7 @@ Write out `7` in longhand.
 
 ```agda
 -- Your code goes here
+seven = suc (suc (suc (suc (suc (suc (suc zero))))))
 ```
 
 You will need to give both a type signature and definition for the
@@ -438,6 +439,13 @@ Compute `3 + 4`, writing out your reasoning as a chain of equations, using the e
 
 ```agda
 -- Your code goes here
+_ : 3 + 4 ≡ 7
+_ =
+  begin
+    3 + 4
+  ≡⟨⟩
+    7
+  ∎
 ```
 
 
@@ -500,6 +508,8 @@ Compute `3 * 4`, writing out your reasoning as a chain of equations, using the e
 
 ```agda
 -- Your code goes here
+_ : 3 * 4 ≡ 12
+_ = refl
 ```
 
 
@@ -597,6 +607,33 @@ Compute `5 ∸ 3` and `3 ∸ 5`, writing out your reasoning as a chain of equati
 
 ```agda
 -- Your code goes here
+∸-example₁ : 5 ∸ 3 ≡ 2
+∸-example₁ =
+  begin
+    5 ∸ 3
+  ≡⟨⟩
+    4 ∸ 2
+  ≡⟨⟩
+    3 ∸ 1
+  ≡⟨⟩
+    2 ∸ 0
+  ≡⟨⟩
+    2
+  ∎
+
+∸-example₂ : 3 ∸ 5 ≡ 0
+∸-example₂ =
+  begin
+    3 ∸ 5
+  ≡⟨⟩
+    2 ∸ 4
+  ≡⟨⟩
+    1 ∸ 3
+  ≡⟨⟩
+    0 ∸ 2
+  ≡⟨⟩
+    0
+  ∎
 ```
 
 
@@ -944,6 +981,31 @@ Confirm that these both give the correct answer for zero through four.
 
 ```agda
 -- Your code goes here
+inc : Bin → Bin
+inc ⟨⟩ = ⟨⟩ I
+inc (n O) = n I
+inc (n I) = inc n O
+
+_ : inc (⟨⟩ I O I I) ≡ ⟨⟩ I I O O
+_ = refl
+
+_ : inc (⟨⟩ I I I I) ≡ ⟨⟩ I O O O O
+_ = refl
+
+to : ℕ → Bin
+to zero = ⟨⟩
+to (suc n) = inc (to n)
+
+from : Bin → ℕ
+from ⟨⟩ = zero
+from (n O) = 2 * from n
+from (n I) = 1 + 2 * from n
+
+_ : to 11 ≡ ⟨⟩ I O I I
+_ = refl
+
+_ : from (⟨⟩ I O I I) ≡ 11
+_ = refl
 ```
 
 
