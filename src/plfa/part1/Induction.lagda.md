@@ -719,6 +719,7 @@ first four days using a finite story of creation, as
 
 ```agda
 -- Your code goes here
+
 ```
 
 ## Associativity with rewrite
@@ -891,6 +892,20 @@ is associative and commutative.
 
 ```agda
 -- Your code goes here
++-swap : ∀ (m n p : ℕ) → m + (n + p) ≡ n + (m + p)
++-swap m n p =
+  begin
+    m + (n + p)
+  ≡⟨ sym (+-assoc m n p) ⟩
+    (m + n) + p
+  ≡⟨ cong (_+ p) (+-comm m n) ⟩
+    (n + m) + p
+  ≡⟨ +-assoc n m p ⟩
+    n + (m + p)
+  ∎
+
++-swap' : ∀ (m n p : ℕ) → m + (n + p) ≡ n + (m + p)
++-swap' m n p rewrite sym (+-assoc m n p) | +-comm m n | +-assoc n m p = refl
 ```
 
 
@@ -904,6 +919,9 @@ for all naturals `m`, `n`, and `p`.
 
 ```agda
 -- Your code goes here
+*-distrib-+ : ∀ (m n p : ℕ) → (m + n) * p ≡ m * p + n * p
+*-distrib-+ zero n p = refl
+*-distrib-+ (suc m) n p rewrite *-distrib-+ m n p | +-assoc p (m * p) (n * p) = refl
 ```
 
 
@@ -917,6 +935,9 @@ for all naturals `m`, `n`, and `p`.
 
 ```agda
 -- Your code goes here
+*-assoc : ∀ (m n p : ℕ) → (m * n) * p ≡ m * (n * p)
+*-assoc zero n p = refl
+*-assoc (suc m) n p rewrite *-distrib-+ n (m * n) p | *-assoc m n p = refl
 ```
 
 
@@ -931,6 +952,37 @@ you will need to formulate and prove suitable lemmas.
 
 ```agda
 -- Your code goes here
+*-identityʳ : ∀ (m : ℕ) → m * zero ≡ zero
+*-identityʳ zero = refl
+*-identityʳ (suc m) = *-identityʳ m
+
+*-sucʳ : ∀ (m n : ℕ) → m * suc n ≡ m + m * n
+*-sucʳ zero n = refl
+*-sucʳ (suc m) n =
+  begin
+    suc m * suc n
+  ≡⟨⟩
+    suc (n + m * suc n)
+  ≡⟨ cong suc (cong (n +_) (*-sucʳ m n)) ⟩
+    suc (n + (m + m * n))
+  ≡⟨ cong suc (+-swap n m (m * n)) ⟩
+    suc (m + (n + m * n))
+  ≡⟨⟩
+    suc m + suc m * n
+  ∎
+
+*-comm : ∀ (m n : ℕ) → m * n ≡ n * m
+*-comm m zero = *-identityʳ m
+*-comm m (suc n) =
+  begin
+    m * suc n
+  ≡⟨ *-sucʳ m n ⟩
+    m + m * n
+  ≡⟨ cong (m +_) (*-comm m n) ⟩
+    m + (n * m)
+  ≡⟨⟩
+    suc n * m
+  ∎
 ```
 
 
@@ -944,6 +996,9 @@ for all naturals `n`. Did your proof require induction?
 
 ```agda
 -- Your code goes here
+0∸n≡0 : ∀ (n : ℕ) → zero ∸ n ≡ zero
+0∸n≡0 zero = refl
+0∸n≡0 (suc n) = refl
 ```
 
 
@@ -957,6 +1012,10 @@ for all naturals `m`, `n`, and `p`.
 
 ```agda
 -- Your code goes here
+∸-+-assoc : ∀ (m n p : ℕ) → m ∸ n ∸ p ≡ m ∸ (n + p)
+∸-+-assoc m zero p = refl
+∸-+-assoc zero (suc n) p = 0∸n≡0 p
+∸-+-assoc (suc m) (suc n) p = ∸-+-assoc m n p
 ```
 
 
@@ -972,6 +1031,39 @@ for all `m`, `n`, and `p`.
 
 ```
 -- Your code goes here
+^-distribˡ-+-* : ∀ (m n p : ℕ) → m ^ (n + p) ≡ (m ^ n) * (m ^ p)
+^-distribˡ-+-* m zero p = sym (+-identityʳ (m ^ p))
+^-distribˡ-+-* m (suc n) p rewrite ^-distribˡ-+-* m n p | *-assoc m (m ^ n) (m ^ p) = refl
+
+^-distribʳ-* : ∀ (m n p : ℕ) → (m * n) ^ p ≡ (m ^ p) * (n ^ p)
+^-distribʳ-* m n zero = refl
+^-distribʳ-* m n (suc p) rewrite ^-distribʳ-* m n p =
+  begin
+    m * n * ((m ^ p) * (n ^ p))
+  ≡⟨ *-assoc m n ((m ^ p) * (n ^ p)) ⟩
+    m * (n * ((m ^ p) * (n ^ p)))
+  ≡⟨ cong (m *_) (sym (*-assoc n (m ^ p) (n ^ p))) ⟩
+    m * (n * (m ^ p) * (n ^ p))
+  ≡⟨ cong (m *_) (cong (_* (n ^ p)) (*-comm n (m ^ p))) ⟩
+    m * ((m ^ p) * n * (n ^ p))
+  ≡⟨ cong (m *_) (*-assoc (m ^ p) n (n ^ p)) ⟩
+    m * ((m ^ p) * (n * (n ^ p)))
+  ≡⟨ sym (*-assoc m (m ^ p) (n * (n ^ p))) ⟩
+    m * (m ^ p) * (n * (n ^ p))
+  ∎
+
+1^n≡1 : ∀ (n : ℕ) → 1 ^ n ≡ 1
+1^n≡1 zero = refl
+1^n≡1 (suc n) rewrite 1^n≡1 n = refl
+
+^-*-assoc : ∀ (m n p : ℕ) → (m ^ n) ^ p ≡ m ^ (n * p)
+^-*-assoc m zero p = 1^n≡1 p
+^-*-assoc m (suc n) p
+  rewrite
+    ^-distribʳ-* m (m ^ n) p
+  | ^-*-assoc m n p
+  | sym (^-distribˡ-+-* m p (n * p))
+  = refl
 ```
 
 
@@ -997,6 +1089,36 @@ For each law: if it holds, prove; if not, give a counterexample.
 
 ```agda
 -- Your code goes here
+data Bin : Set where
+  ⟨⟩ : Bin
+  _O : Bin → Bin
+  _I : Bin → Bin
+
+inc : Bin → Bin
+inc ⟨⟩ = ⟨⟩ I
+inc (b O) = b I
+inc (b I) = inc b O
+
+from : Bin → ℕ
+from ⟨⟩ = zero
+from (b O) = 2 * from b
+from (b I) = 1 + 2 * from b
+
+to : ℕ → Bin
+to zero = ⟨⟩
+to (suc n) = inc (to n)
+
+from-inc : ∀ (b : Bin) → from (inc b) ≡ suc (from b)
+from-inc ⟨⟩ = refl
+from-inc (b O) = refl
+from-inc (b I) rewrite from-inc b | +-suc′ (from b) (from b + 0) = refl
+
+_ : to (from (⟨⟩ O)) ≡ ⟨⟩
+_ = refl
+
+from-to : ∀ (n : ℕ) → from (to n) ≡ n
+from-to zero = refl
+from-to (suc n) rewrite from-inc (to n) | from-to n = refl
 ```
 
 
