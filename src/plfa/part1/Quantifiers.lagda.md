@@ -90,9 +90,14 @@ dependent product is ambiguous.
 
 Show that universals distribute over conjunction:
 ```agda
-postulate
-  ∀-distrib-× : ∀ {A : Set} {B C : A → Set} →
+∀-distrib-× : ∀ {A : Set} {B C : A → Set} →
     (∀ (x : A) → B x × C x) ≃ (∀ (x : A) → B x) × (∀ (x : A) → C x)
+∀-distrib-× = record
+  { to = λ f → ⟨ (λ x → proj₁ (f x)) , (λ x → proj₂ (f x)) ⟩
+  ; from = λ f x → ⟨ proj₁ f x , proj₂ f x ⟩
+  ; from∘to = λ f → refl
+  ; to∘from = λ f → refl
+  }
 ```
 Compare this with the result (`→-distrib-×`) in
 Chapter [Connectives](/Connectives/).
@@ -101,9 +106,10 @@ Chapter [Connectives](/Connectives/).
 
 Show that a disjunction of universals implies a universal of disjunctions:
 ```agda
-postulate
-  ⊎∀-implies-∀⊎ : ∀ {A : Set} {B C : A → Set} →
+⊎∀-implies-∀⊎ : ∀ {A : Set} {B C : A → Set} →
     (∀ (x : A) → B x) ⊎ (∀ (x : A) → C x) → ∀ (x : A) → B x ⊎ C x
+⊎∀-implies-∀⊎ (inj₁ b) x = inj₁ (b x)
+⊎∀-implies-∀⊎ (inj₂ c) x = inj₂ (c x)
 ```
 Does the converse hold? If so, prove; if not, explain why.
 
@@ -121,6 +127,23 @@ Let `B` be a type indexed by `Tri`, that is `B : Tri → Set`.
 Show that `∀ (x : Tri) → B x` is isomorphic to `B aa × B bb × B cc`.
 Hint: you will need to postulate a version of extensionality that
 works for dependent functions.
+
+```agda
+open plfa.part1.Isomorphism using (∀-extensionality)
+
+∀-× : ∀ {B : Tri → Set} → (∀ (x : Tri) → B x) ≃ B aa × B bb × B cc
+∀-× = record
+  { to = λ f → ⟨ f aa , ⟨ f bb , f cc ⟩ ⟩
+  ; from = λ { ⟨ a , ⟨ b , c ⟩ ⟩ → λ
+      { aa → a
+      ; bb → b
+      ; cc → c
+      }
+    }
+  ; from∘to = λ f → ∀-extensionality λ { aa → refl ; bb → refl ; cc → refl }
+  ; to∘from = λ { ⟨ a , ⟨ b , c ⟩ ⟩ → refl }
+  }
+```
 
 
 ## Existentials
@@ -246,18 +269,35 @@ establish the isomorphism is identical to what we wrote when discussing
 
 Show that existentials distribute over disjunction:
 ```agda
-postulate
-  ∃-distrib-⊎ : ∀ {A : Set} {B C : A → Set} →
+∃-distrib-⊎ : ∀ {A : Set} {B C : A → Set} →
     ∃[ x ] (B x ⊎ C x) ≃ (∃[ x ] B x) ⊎ (∃[ x ] C x)
+∃-distrib-⊎ = record
+  { to = λ
+    { ⟨ x , inj₁ b ⟩ → inj₁ ⟨ x , b ⟩
+    ; ⟨ x , inj₂ c ⟩ → inj₂ ⟨ x , c ⟩
+    }
+  ; from = λ
+    { (inj₁ ⟨ x , b ⟩) → ⟨ x , inj₁ b ⟩
+    ; (inj₂ ⟨ x , c ⟩) → ⟨ x , inj₂ c ⟩
+    }
+  ; from∘to = λ
+    { ⟨ x , inj₁ b ⟩ → refl
+    ; ⟨ x , inj₂ c ⟩ → refl
+    }
+  ; to∘from = λ
+    { (inj₁ ⟨ x , b ⟩) → refl
+    ; (inj₂ ⟨ x , c ⟩) → refl
+    }
+  }
 ```
 
 #### Exercise `∃×-implies-×∃` (practice)
 
 Show that an existential of conjunctions implies a conjunction of existentials:
 ```agda
-postulate
-  ∃×-implies-×∃ : ∀ {A : Set} {B C : A → Set} →
+∃×-implies-×∃ : ∀ {A : Set} {B C : A → Set} →
     ∃[ x ] (B x × C x) → (∃[ x ] B x) × (∃[ x ] C x)
+∃×-implies-×∃ ⟨ x , ⟨ b , c ⟩ ⟩ = ⟨ ⟨ x , b ⟩ , ⟨ x , c ⟩ ⟩
 ```
 Does the converse hold? If so, prove; if not, explain why.
 
@@ -265,6 +305,23 @@ Does the converse hold? If so, prove; if not, explain why.
 
 Let `Tri` and `B` be as in Exercise `∀-×`.
 Show that `∃[ x ] B x` is isomorphic to `B aa ⊎ B bb ⊎ B cc`.
+```agda
+∃-⊎ : ∀ {B : Tri → Set} → (∃[ x ] B x) ≃ (B aa ⊎ B bb ⊎ B cc)
+∃-⊎ = record
+  { to = λ
+    { ⟨ aa , a ⟩ → inj₁ a
+    ; ⟨ bb , b ⟩ → inj₂ (inj₁ b)
+    ; ⟨ cc , c ⟩ → inj₂ (inj₂ c)
+    }
+  ; from = λ
+    { (inj₁ a) → ⟨ aa , a ⟩
+    ; (inj₂ (inj₁ b)) → ⟨ bb , b ⟩
+    ; (inj₂ (inj₂ c)) → ⟨ cc , c ⟩
+    }
+  ; from∘to = λ { ⟨ aa , _ ⟩ → refl ; ⟨ bb , _ ⟩ → refl ; ⟨ cc , _ ⟩ → refl }
+  ; to∘from = λ { (inj₁ _) → refl ; (inj₂ (inj₁ _)) → refl ; (inj₂ (inj₂ _)) → refl }
+  }
+```
 
 
 ## An existential example
@@ -376,6 +433,15 @@ restated in this way.
 
 ```agda
 -- Your code goes here
+open import Data.Nat.Properties using (+-comm; +-suc)
+
+∃-even′ : ∀ {n : ℕ} → ∃[ m ] (2 * m ≡ n) → even n
+∃-odd′ : ∀ {n : ℕ} → ∃[ m ] (2 * m + 1 ≡ n) → odd n
+
+∃-even′ ⟨ zero , refl ⟩ = even-zero
+∃-even′ ⟨ suc m , refl ⟩ rewrite +-suc m (m + 0) = even-suc (odd-suc (∃-even′ ⟨ m , refl ⟩))
+∃-odd′ ⟨ m , refl ⟩ rewrite +-comm (m + (m + 0)) 1 = odd-suc (∃-even′ ⟨ m , refl ⟩)
+
 ```
 
 #### Exercise `∃-+-≤` (practice)
@@ -385,6 +451,21 @@ Show that `y ≤ z` holds if and only if there exists a `x` such that
 
 ```agda
 -- Your code goes here
+open import Data.Nat.Properties using (+-identityʳ; +-suc)
+open import plfa.part1.Relations using (_≤_; z≤n; s≤s; +-monoˡ-≤)
+open import plfa.part1.Isomorphism using (_⇔_)
+
+
+∃-+-≤ : ∀ {y z : ℕ} → (y ≤ z) ⇔ (∃[ x ] (x + y ≡ z))
+∃-+-≤ {y} {z} = record { to = to ; from = from }
+  where
+    to : ∀ {y z : ℕ} → y ≤ z → ∃[ x ] (x + y ≡ z)
+    to {z = z} z≤n = ⟨ z , +-identityʳ z ⟩
+    to {y = suc y} (s≤s y≤z) with to y≤z
+    ... | ⟨ x , refl ⟩ = ⟨ x , +-suc x y ⟩
+
+    from : ∀ {y z : ℕ} → (∃[ x ] (x + y ≡ z)) → y ≤ z
+    from {y = y} ⟨ x , refl ⟩ = +-monoˡ-≤ 0 x y z≤n
 ```
 
 
@@ -427,11 +508,11 @@ requires extensionality.
 
 Show that existential of a negation implies negation of a universal:
 ```agda
-postulate
-  ∃¬-implies-¬∀ : ∀ {A : Set} {B : A → Set}
+∃¬-implies-¬∀ : ∀ {A : Set} {B : A → Set}
     → ∃[ x ] (¬ B x)
       --------------
     → ¬ (∀ x → B x)
+∃¬-implies-¬∀ ⟨ x , ¬bx ⟩ b = ¬bx (b x) 
 ```
 Does the converse hold? If so, prove; if not, explain why.
 
@@ -479,6 +560,33 @@ which is a corollary of `≡Can`.
 
 ```agda
 -- Your code goes here
+open Eq using (cong)
+open import plfa.part1.Induction using (Bin; from; to; from-to)
+open import plfa.part1.Relations using (One; _O; _I; Can; zero; one; to-from; Can-to)
+
+
+≡One : ∀ {b : Bin} (o o′ : One b) → o ≡ o′
+≡One One.⟨⟩I One.⟨⟩I = refl
+≡One (o One.O) (o′ One.O) = cong _O (≡One o o′)
+≡One (o One.I) (o′ One.I) = cong _I (≡One o o′)
+
+≡Can : ∀ {b : Bin} (cb cb′ : Can b) → cb ≡ cb′
+≡Can zero zero = refl
+≡Can (one o) (one o′) = cong one (≡One o o′)
+
+∃-proj₁ : ∀ {A : Set} {B : A → Set} → (∃[ x ] B x) → A
+∃-proj₁ ⟨ x , _ ⟩ = x
+
+proj₁≡-Can≡ : ∀ {cb cb′ : ∃[ b ] Can b} → ∃-proj₁ cb ≡ ∃-proj₁ cb′ → cb ≡ cb′
+proj₁≡-Can≡ {⟨ b , cb ⟩} {⟨ b′ , cb′ ⟩} refl rewrite ≡Can cb cb′ = refl
+
+ℕ≃Can : ℕ ≃ (∃[ b ] Can b)
+ℕ≃Can = record
+  { to = λ n → ⟨ to n , Can-to n ⟩
+  ; from = λ { ⟨ b , _ ⟩ → from b }
+  ; from∘to = λ n → from-to n
+  ; to∘from = λ { ⟨ b , cb ⟩ → proj₁≡-Can≡ (to-from cb) }
+  }
 ```
 
 
