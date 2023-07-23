@@ -365,6 +365,66 @@ regard to inequality.  Rewrite all of `+-monoˡ-≤`, `+-monoʳ-≤`, and `+-mon
 
 ```agda
 -- Your code goes here
+
+module ≤-Reasoning where
+  infix 4 _≤_
+
+  data _≤_ : ℕ → ℕ → Set where
+    z≤n : ∀ {n : ℕ} → zero ≤ n
+    s≤s : ∀ {m n : ℕ} → m ≤ n → suc m ≤ suc n
+
+  ≤-refl : ∀ {n : ℕ} → n ≤ n
+  ≤-refl {zero} = z≤n
+  ≤-refl {suc n} = s≤s ≤-refl
+
+  ≤-trans : ∀ {m n p : ℕ} → m ≤ n → n ≤ p → m ≤ p
+  ≤-trans z≤n n≤p = z≤n
+  ≤-trans (s≤s m≤n) (s≤s n≤p) = s≤s (≤-trans m≤n n≤p)
+
+  infix  1 ≤begin_
+  infixr 2 _≤⟨⟩_ _≤⟨_⟩_
+  infix  3 _≤∎
+
+  ≤begin_ : ∀ {x y : ℕ} → x ≤ y → x ≤ y
+  ≤begin x≤y = x≤y
+
+  _≤⟨⟩_ : ∀ (x : ℕ) {y : ℕ} → x ≤ y → x ≤ y
+  x ≤⟨⟩ x≤y = x≤y
+
+  _≤⟨_⟩_ : ∀ (x : ℕ) {y z : ℕ} → x ≤ y → y ≤ z → x ≤ z
+  x ≤⟨ x≤y ⟩ y≤z = ≤-trans x≤y y≤z
+
+  _≤∎ : ∀ (x : ℕ) → x ≤ x
+  x ≤∎ = ≤-refl
+
+  ≡→≤ : ∀ {m n : ℕ} → m ≡ n → m ≤ n
+  ≡→≤ refl = ≤-refl
+
+  +-monoʳ-≤ : ∀ (m n p : ℕ) → m ≤ n → p + m ≤ p + n
+  +-monoʳ-≤ m n zero m≤n = m≤n
+  +-monoʳ-≤ m n (suc p) m≤n = s≤s (+-monoʳ-≤ m n p m≤n)
+
+  +-monoˡ-≤ : ∀ (m n p : ℕ) → m ≤ n → m + p ≤ n + p
+  +-monoˡ-≤ m n p m≤n =
+    ≤begin
+      m + p
+    ≤⟨ ≡→≤ (+-comm m p) ⟩
+      p + m
+    ≤⟨ +-monoʳ-≤ m n p m≤n ⟩
+      p + n
+    ≤⟨ ≡→≤ (+-comm p n) ⟩
+      n + p
+    ≤∎
+
+  +-mono-≤ : ∀ (m n p q : ℕ) → m ≤ n → p ≤ q → m + p ≤ n + q
+  +-mono-≤ m n p q m≤n p≤q =
+    ≤begin
+      m + p
+    ≤⟨ +-monoˡ-≤ m n p m≤n ⟩
+      n + p
+    ≤⟨ +-monoʳ-≤ p q n p≤q ⟩
+      n + q
+    ≤∎
 ```
 
 
