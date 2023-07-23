@@ -239,6 +239,13 @@ is isomorphic to `(A → B) × (B → A)`.
 
 ```agda
 -- Your code goes here
+⇔≃× : ∀ {A B : Set} → (A ⇔ B) ≃ (A → B) × (B → A)
+⇔≃× = record
+  { to = λ A⇔B → ⟨ _⇔_.to A⇔B , _⇔_.from A⇔B ⟩
+  ; from = λ{ ⟨ A→B , B→A ⟩ → record { to = A→B ; from = B→A } }
+  ; from∘to = λ A⇔B → refl
+  ; to∘from = λ { ⟨ A→B , B→A ⟩ → refl }
+  }
 ```
 
 
@@ -452,6 +459,13 @@ Show sum is commutative up to isomorphism.
 
 ```agda
 -- Your code goes here
+⊎-comm : ∀ {A B : Set} → A ⊎ B ≃ B ⊎ A
+⊎-comm = record
+  { to = λ { (inj₁ a) → inj₂ a ; (inj₂ b) → inj₁ b }
+  ; from = λ { (inj₁ b) → inj₂ b ; (inj₂ a) → inj₁ a }
+  ; from∘to = λ { (inj₁ a) → refl ; (inj₂ b) → refl }
+  ; to∘from = λ { (inj₁ b) → refl ; (inj₂ a) → refl }
+  }
 ```
 
 #### Exercise `⊎-assoc` (practice)
@@ -460,6 +474,21 @@ Show sum is associative up to isomorphism.
 
 ```agda
 -- Your code goes here
+⊎-assoc : ∀ {A B C : Set} → (A ⊎ B) ⊎ C ≃ A ⊎ (B ⊎ C)
+⊎-assoc = record
+  { to = λ
+    { (inj₁ (inj₁ x)) → inj₁ x
+    ; (inj₁ (inj₂ x)) → inj₂ (inj₁ x)
+    ; (inj₂ x) → inj₂ (inj₂ x)
+    }
+  ; from = λ
+    { (inj₁ x) → inj₁ (inj₁ x)
+    ; (inj₂ (inj₁ x)) → inj₁ (inj₂ x)
+    ; (inj₂ (inj₂ x)) → inj₂ x
+    }
+  ; from∘to = λ { (inj₁ (inj₁ x)) → refl ; (inj₁ (inj₂ x)) → refl ; (inj₂ x) → refl }
+  ; to∘from = λ { (inj₁ x) → refl ; (inj₂ (inj₁ x)) → refl ; (inj₂ (inj₂ x)) → refl }
+  }
 ```
 
 ## False is empty
@@ -523,6 +552,13 @@ Show empty is the left identity of sums up to isomorphism.
 
 ```agda
 -- Your code goes here
+⊥-identityˡ : ∀ {A : Set} → ⊥ ⊎ A ≃ A
+⊥-identityˡ = record
+  { to = λ { (inj₂ a) → a }
+  ; from = λ a → inj₂ a
+  ; from∘to = λ { (inj₂ a) → refl }
+  ; to∘from = λ a → refl
+  }
 ```
 
 #### Exercise `⊥-identityʳ` (practice)
@@ -531,6 +567,13 @@ Show empty is the right identity of sums up to isomorphism.
 
 ```agda
 -- Your code goes here
+⊥-identityʳ : ∀ {A : Set} → A ⊎ ⊥ ≃ A
+⊥-identityʳ = record
+  { to = λ { (inj₁ a) → a }
+  ; from = λ a → inj₁ a
+  ; from∘to = λ { (inj₁ a) → refl }
+  ; to∘from = λ a → refl
+  }
 ```
 
 ## Implication is function {#implication}
@@ -762,6 +805,9 @@ distributive law, and explain how it relates to the weak version.
 
 ```agda
 -- Your code goes here
+⊎-weak-×′ : ∀ {A B C : Set} → (A ⊎ B) × C → A ⊎ (B × C)
+⊎-weak-×′ ⟨ inj₁ a , c ⟩ = inj₁ a
+⊎-weak-×′ ⟨ inj₂ b , c ⟩ = inj₂ ⟨ b , c ⟩
 ```
 
 
@@ -776,6 +822,9 @@ Does the converse hold? If so, prove; if not, give a counterexample.
 
 ```agda
 -- Your code goes here
+⊎×-implies-×⊎′ : ∀ {A B C D : Set} → (A × B) ⊎ (C × D) → (A ⊎ C) × (B ⊎ D)
+⊎×-implies-×⊎′ (inj₁ ⟨ a , b ⟩) = ⟨ inj₁ a , inj₁ b ⟩
+⊎×-implies-×⊎′ (inj₂ ⟨ c , d ⟩) = ⟨ inj₂ c , inj₂ d ⟩
 ```
 
 
