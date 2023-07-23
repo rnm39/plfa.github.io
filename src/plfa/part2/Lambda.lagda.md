@@ -194,6 +194,12 @@ defined earlier.
 
 ```agda
 -- Your code goes here
+mul : Term
+mul = μ "*" ⇒ ƛ "m" ⇒ ƛ "n" ⇒
+  case ` "m"
+    [zero⇒ `zero
+    |suc "m" ⇒ plus · ` "m" · (` "*" · ` "m" · ` "n")
+    ]
 ```
 
 
@@ -206,6 +212,14 @@ definition may use `plusᶜ` as defined earlier (or may not
 
 ```agda
 -- Your code goes here
+mulᶜ : Term
+mulᶜ = ƛ "m" ⇒ ƛ "n" ⇒ ƛ "s" ⇒ ƛ "z" ⇒ ` "m" · (` "n" · ` "s") · ` "z"
+
+zeroᶜ : Term
+zeroᶜ = ƛ "s" ⇒ ƛ "z" ⇒ ` "z"
+
+mulᶜ′ : Term
+mulᶜ′ = ƛ "m" ⇒ ƛ "n" ⇒ ` "m" · (plusᶜ · ` "n") · zeroᶜ
 ```
 
 
@@ -258,6 +272,15 @@ plus′ = μ′ + ⇒ ƛ′ m ⇒ ƛ′ n ⇒
   n  =  ` "n"
 ```
 Write out the definition of multiplication in the same style.
+```agda
+mul′ : Term
+mul′ = μ′ * ⇒ ƛ′ m ⇒ ƛ′ n ⇒
+  case′ m [zero⇒ `zero |suc m ⇒ plus′ · m · (* · m · n) ]
+  where
+  * = ` "*"
+  m = ` "m"
+  n = ` "n"
+```
 
 
 ### Formal vs informal
@@ -529,6 +552,11 @@ What is the result of the following substitution?
 3. `` (ƛ "y" ⇒ `zero · (ƛ "x" ⇒ ` "x")) ``
 4. `` (ƛ "y" ⇒ `zero · (ƛ "x" ⇒ `zero)) ``
 
+3
+```agda
+_ : (ƛ "y" ⇒ ` "x" · (ƛ "x" ⇒ ` "x")) [ "x" := `zero ] ≡ (ƛ "y" ⇒ `zero · (ƛ "x" ⇒ ` "x"))
+_ = refl
+```
 
 #### Exercise `_[_:=_]′` (stretch)
 
@@ -540,6 +568,23 @@ substitution.
 
 ```agda
 -- Your code goes here
+_[_:=_]′ : Term → Id → Term → Term
+_[_!_:=_] : Term → Id → Id → Term → Term
+
+(` x) [ y := V ]′ with x ≟ y
+... | yes _ = V
+... | no _ = ` x
+(ƛ x ⇒ N) [ y := V ]′ = ƛ x ⇒ N [ x ! y := V ]
+(L · M) [ y := V ]′ = L [ y := V ] · M [ y := V ]
+`zero [ y := V ]′ = `zero
+(`suc M) [ y := V ]′ = `suc M [ y := V ]
+case L [zero⇒ M |suc x ⇒ N ] [ y := V ]′ =
+  case L [ y := V ] [zero⇒ M [ y := V ] |suc x ⇒ N [ x ! y := V ] ]
+(μ x ⇒ N) [ y := V ]′ = μ x ⇒ N [ x ! y := V ]
+
+L [ x ! y := V ] with x ≟ y
+... | yes _ = L
+... | no _ = L [ y := V ]
 ```
 
 
@@ -668,6 +713,13 @@ What does the following term step to?
 2.  `` (ƛ "x" ⇒ ` "x") · (ƛ "x" ⇒ ` "x") ``
 3.  `` (ƛ "x" ⇒ ` "x") · (ƛ "x" ⇒ ` "x") · (ƛ "x" ⇒ ` "x") ``
 
+1
+```agda
+ƛxx = ƛ "x" ⇒ ` "x"
+
+_ : ƛxx · ƛxx —→ ƛxx
+_ = β-ƛ V-ƛ
+```
 What does the following term step to?
 
     (ƛ "x" ⇒ ` "x") · (ƛ "x" ⇒ ` "x") · (ƛ "x" ⇒ ` "x")  —→  ???
@@ -676,6 +728,11 @@ What does the following term step to?
 2.  `` (ƛ "x" ⇒ ` "x") · (ƛ "x" ⇒ ` "x") ``
 3.  `` (ƛ "x" ⇒ ` "x") · (ƛ "x" ⇒ ` "x") · (ƛ "x" ⇒ ` "x") ``
 
+2
+```agda
+_ : ƛxx · ƛxx · ƛxx —→ ƛxx · ƛxx
+_ = ξ-·₁ (β-ƛ V-ƛ)
+```
 What does the following term step to?  (Where `twoᶜ` and `sucᶜ` are as
 defined above.)
 
@@ -685,6 +742,11 @@ defined above.)
 2.  `` (ƛ "z" ⇒ sucᶜ · (sucᶜ · ` "z")) · `zero ``
 3.  `` `zero ``
 
+2
+```agda
+_ : twoᶜ · sucᶜ · `zero —→ (ƛ "z" ⇒ sucᶜ · (sucᶜ · ` "z")) · `zero
+_ = ξ-·₁ (β-ƛ V-ƛ)
+```
 
 ## Reflexive and transitive closure
 
@@ -764,6 +826,31 @@ above embeds into the second. Why are they not isomorphic?
 
 ```agda
 -- Your code goes here
+open import plfa.part1.Isomorphism using (_≲_)
+
+_++—↠_ : ∀ {L M N} → L —↠ M → M —↠ N → L —↠ N
+(M ∎) ++—↠ MN = MN
+(_—→⟨_⟩_ L {O} LO OM) ++—↠ MN = L —→⟨ LO ⟩ (OM ++—↠ MN)
+
+—↠≲—↠′ : ∀ {M N} → M —↠ N ≲ M —↠′ N
+—↠≲—↠′ {M} {N} = record
+  { to = to
+  ; from = from
+  ; from∘to = from∘to
+  }
+  where
+  to : ∀ {M N} → M —↠ N → M —↠′ N
+  to (M ∎) = refl′
+  to (_—→⟨_⟩_ M {L} {N} ML LN) = trans′ (step′ ML) (to LN)
+
+  from : ∀ {M N} → M —↠′ N → M —↠ N
+  from (step′ {M} {N} MN) = M —→⟨ MN ⟩ N ∎
+  from (refl′ {M}) = M ∎
+  from (trans′ {M} {L} {N} ML LN) = from ML ++—↠ from LN
+
+  from∘to : ∀ {M N : Term} (MN : M —↠ N) → from (to MN) ≡ MN
+  from∘to (M ∎) = refl
+  from∘to (_—→⟨_⟩_ M {L} {N} ML LN) rewrite from∘to LN = refl
 ```
 
 ## Confluence
@@ -929,6 +1016,33 @@ Write out the reduction sequence demonstrating that one plus one is two.
 
 ```agda
 -- Your code goes here
+one : Term
+one = `suc `zero
+
+_ : plus · one · one —↠ two
+_ =
+  begin
+    plus · one · one
+  —→⟨ ξ-·₁ (ξ-·₁ β-μ) ⟩
+    (ƛ "m" ⇒ ƛ "n" ⇒ case m [zero⇒ n |suc "m" ⇒ `suc (plus · m · n)]) · one · one
+  —→⟨ ξ-·₁ (β-ƛ (V-suc V-zero)) ⟩
+    (ƛ "n" ⇒ case one [zero⇒ n |suc "m" ⇒ `suc (plus · m · n)]) · one
+  —→⟨ β-ƛ (V-suc V-zero) ⟩
+    case one [zero⇒ one |suc "m" ⇒ `suc (plus · m · one)]
+  —→⟨ β-suc V-zero ⟩
+    `suc (plus · `zero · one)
+  —→⟨ ξ-suc (ξ-·₁ (ξ-·₁ β-μ)) ⟩
+    `suc ((ƛ "m" ⇒ ƛ "n" ⇒ case m [zero⇒ n |suc "m" ⇒ `suc (plus · m · n)]) · `zero · one)
+  —→⟨ ξ-suc (ξ-·₁ (β-ƛ V-zero))⟩
+    `suc ((ƛ "n" ⇒ case `zero [zero⇒ n |suc "m" ⇒ `suc (plus · m · n)]) · one)
+  —→⟨ ξ-suc (β-ƛ (V-suc V-zero))⟩
+    `suc (case `zero [zero⇒ one |suc "m" ⇒ `suc (plus · m · one)])
+  —→⟨ ξ-suc β-zero ⟩
+    two
+  ∎
+  where
+  n = ` "n"
+  m = ` "m"
 ```
 
 
@@ -980,6 +1094,8 @@ Thus:
 
   Give more than one answer if appropriate.
 
+  2
+
 * What is the type of the following term?
 
     `` (ƛ "s" ⇒ ` "s" · (` "s"  · `zero)) · sucᶜ ``
@@ -992,6 +1108,8 @@ Thus:
   6. `` `ℕ ``
 
   Give more than one answer if appropriate.
+
+  6
 
 
 ## Typing
@@ -1037,6 +1155,36 @@ to the list
 
 ```agda
 -- Your code goes here
+open import Data.Product using () renaming (_,_ to ⟨_,_⟩)
+open import plfa.part1.Isomorphism using (_≃_)
+
+Context-≃ : Context ≃ List (Id × Type)
+Context-≃ = record
+  { to = to
+  ; from = from
+  ; from∘to = from∘to
+  ; to∘from = to∘from
+  }
+  where
+  to : Context → List (Id × Type)
+  to ∅ = []
+  to (Γ , x ⦂ A) = ⟨ x , A ⟩ ∷ to Γ
+
+  from : List (Id × Type) → Context
+  from [] = ∅
+  from (⟨ x , A ⟩ ∷ Γ) = from Γ , x ⦂ A
+
+  from∘to : (Γ : Context) → from (to Γ) ≡ Γ
+  from∘to ∅ = refl
+  from∘to (Γ , x ⦂ A) rewrite from∘to Γ = refl
+
+  to∘from : (Γ : List (Id × Type)) → to (from Γ) ≡ Γ
+  to∘from [] = refl
+  to∘from (⟨ x , A ⟩ ∷ Γ) rewrite to∘from Γ = refl
+
+_ : _≃_.to Context-≃ (∅ , "s" ⦂ `ℕ ⇒ `ℕ , "z" ⦂ `ℕ)
+  ≡ ⟨ "z" , `ℕ ⟩ ∷ ⟨ "s" , (`ℕ ⇒ `ℕ) ⟩ ∷ []
+_ = refl
 ```
 
 ### Lookup judgment
@@ -1379,12 +1527,30 @@ or explain why there is no such `A`.
 2. `` ∅ , "y" ⦂ `ℕ ⇒ `ℕ , "x" ⦂ `ℕ ⊢ ` "x" · ` "y" ⦂ A ``
 3. `` ∅ , "y" ⦂ `ℕ ⇒ `ℕ ⊢ ƛ "x" ⇒ ` "y" · ` "x" ⦂ A ``
 
+```agda
+_ : ∅ , "y" ⦂ `ℕ ⇒ `ℕ , "x" ⦂ `ℕ ⊢ ` "y" · ` "x" ⦂ `ℕ
+_ = (⊢` (S′ Z)) · (⊢` Z)
+
+_ : ∀ {A} → ¬ (∅ , "y" ⦂ `ℕ ⇒ `ℕ , "x" ⦂ `ℕ ⊢ ` "x" · ` "y" ⦂ A)
+_ = λ { (⊢` (S _ (S _ ())) · _) }
+
+_ : ∅ , "y" ⦂ `ℕ ⇒ `ℕ ⊢ ƛ "x" ⇒ ` "y" · ` "x" ⦂ `ℕ ⇒ `ℕ
+_ = ⊢ƛ ((⊢` (S′ Z)) · (⊢` Z))
+```
+
 For each of the following, give types `A`, `B`, and `C` for which it is derivable,
 or explain why there are no such types.
 
 1. `` ∅ , "x" ⦂ A ⊢ ` "x" · ` "x" ⦂ B ``
 2. `` ∅ , "x" ⦂ A , "y" ⦂ B ⊢ ƛ "z" ⇒ ` "x" · (` "y" · ` "z") ⦂ C ``
 
+```agda
+_ : ∀ {A B} → ¬ (∅ , "x" ⦂ A ⊢ ` "x" · ` "x" ⦂ B)
+_ = λ { (⊢` Z · ⊢` (S _ ())) }
+
+_ : ∅ , "x" ⦂ `ℕ ⇒ `ℕ , "y" ⦂ `ℕ ⇒ `ℕ ⊢ ƛ "z" ⇒ ` "x" · (` "y" · ` "z") ⦂ `ℕ ⇒ `ℕ
+_ = ⊢ƛ ((⊢` (S′ (S′ Z))) · ((⊢` (S′ Z)) · ⊢` Z))
+```
 
 #### Exercise `⊢mul` (recommended)
 
@@ -1393,6 +1559,12 @@ showing that it is well typed.
 
 ```agda
 -- Your code goes here
+⊢mul : ∀ {Γ} → Γ ⊢ mul ⦂ `ℕ ⇒ `ℕ ⇒ `ℕ
+⊢mul = ⊢μ (⊢ƛ (⊢ƛ (⊢case
+    (⊢` (S′ Z))
+    ⊢zero
+    ((⊢plus · (⊢` Z)) · (((⊢` (S′ (S′ (S′ Z)))) · ⊢` Z) · ⊢` (S′ Z)))
+  )))
 ```
 
 
@@ -1403,6 +1575,8 @@ showing that it is well typed.
 
 ```agda
 -- Your code goes here
+⊢mulᶜ : ∀ {Γ A} → Γ ⊢ mulᶜ ⦂ Ch A ⇒ Ch A ⇒ Ch A
+⊢mulᶜ = ⊢ƛ (⊢ƛ (⊢ƛ (⊢ƛ ((⊢` (S′ (S′ (S′ Z)))) · ((⊢` (S′ (S′ Z))) · ⊢` (S′ Z)) · ⊢` Z))))
 ```
 
 
