@@ -191,6 +191,10 @@ is irreflexive, that is, `n < n` holds for no `n`.
 
 ```agda
 -- Your code goes here
+open import plfa.part1.Relations using (_<_; s<s)
+
+<-irreflexive : ∀ {n : ℕ} → ¬ n < n
+<-irreflexive (s<s n<n) = <-irreflexive n<n
 ```
 
 
@@ -209,6 +213,26 @@ but that when one holds the negation of the other two must also hold.
 
 ```agda
 -- Your code goes here
+open plfa.part1.Relations using (_>_)
+open Relation.Binary.PropositionalEquality using (sym; subst)
+
+<→≢ : ∀ {m n : ℕ} → m < n → ¬ m ≡ n
+<→≢ {m} {n} m<n m≡n = <-irreflexive (subst (_< n) m≡n m<n)
+
+<→≯ : ∀ {m n : ℕ} → m < n → ¬ m > n
+<→≯ (s<s m<n) (s<s m>n) = <→≯ m<n m>n
+
+≡→≮ : ∀ {m n : ℕ} → m ≡ n → ¬ m < n
+≡→≮ m≡n m<n = <→≢ m<n m≡n
+
+≡→≯ : ∀ {m n : ℕ} → m ≡ n → ¬ m > n
+≡→≯ m≡n m>n = ≡→≮ (sym m≡n) m>n
+
+>→≮ : ∀ {m n : ℕ} → m > n → ¬ m < n
+>→≮ m>n m<n = <→≯ m<n m>n
+
+>→≢ : ∀ {m n : ℕ} → m > n → ¬ m ≡ n
+>→≢ m>n m≡n = <→≢ m>n (sym m≡n)
 ```
 
 #### Exercise `⊎-dual-×` (recommended)
@@ -222,6 +246,21 @@ This result is an easy consequence of something we've proved previously.
 
 ```agda
 -- Your code goes here
+open Data.Product using (_,_)
+
+absurd : ∀ {A : Set} → ⊥ → A
+absurd ()
+
+¬-≡ : ∀ {A : Set} (p q : ¬ A) → p ≡ q
+¬-≡ p q = extensionality λ a → absurd (p a)
+
+⊎-dual-× : ∀ {A B : Set} → ¬ (A ⊎ B) ≃ (¬ A) × (¬ B)
+⊎-dual-× = record
+  { to = λ p → (λ a → p (inj₁ a)) , (λ b → p (inj₂ b))
+  ; from = λ{ (¬a , ¬b) → λ { (inj₁ a) → ¬a a ; (inj₂ b) → ¬b b } } 
+  ; from∘to = λ p → ¬-≡ _ _
+  ; to∘from = λ{ (¬a , ¬b) → refl }
+  }
 ```
 
 
@@ -379,6 +418,53 @@ Show that each of these implies all the others.
 
 ```agda
 -- Your code goes here
+
+-- Excluded Middle
+EM = ∀ (A : Set) → A ⊎ ¬ A
+-- Double Negation Elimination
+DNE = ∀ (A : Set) → ¬ ¬ A → A
+-- Peirce's Law
+PL = ∀ (A B : Set) → ((A → B) → A) → A
+-- Implication as disjunction
+ID = ∀ (A B : Set) → (A → B) → ¬ A ⊎ B
+-- De Morgan
+DM = ∀ (A B : Set) → ¬ (¬ A × ¬ B) → A ⊎ B
+
+EM→DNE : EM → DNE
+EM→DNE h A ¬¬a with h A
+... | inj₁ a = a
+... | inj₂ ¬a = absurd (¬¬a ¬a)
+
+DNE→PL : DNE → PL
+DNE→PL h A B = h (((A → B) → A) → A) λ ¬t → ¬t λ ab→a → ab→a λ a → absurd (¬t λ _ → a)
+
+PL→ID : PL → ID
+PL→ID h A B a→b = h (¬ A ⊎ B) ⊥ λ ¬t → inj₁ λ a → ¬t (inj₂ (a→b a))
+
+ID→DM : ID → DM
+ID→DM h A B f with h A A (λ a → a) | h B B (λ b → b)
+... | inj₁ ¬a | inj₁ ¬b = absurd (f (¬a , ¬b))
+... | inj₁ _ | inj₂ b = inj₂ b
+... | inj₂ a | _ = inj₁ a
+
+DM→EM : DM → EM
+DM→EM h A = h A (¬ A) λ{ (¬a , ¬¬a) → ¬¬a ¬a }
+
+
+EM→PL : EM → PL
+EM→PL h A B ab→a with h A
+... | inj₁ a = a
+... | inj₂ ¬a = ab→a λ a → absurd (¬a a)
+
+DNE→EM : DNE → EM
+DNE→EM h A = h (A ⊎ ¬ A) λ ¬t → ¬t (inj₁ (h A λ ¬a → ¬a (absurd (¬t (inj₂ ¬a)))))
+
+PL→EM : PL → EM
+PL→EM h A = h (A ⊎ ¬ A) ⊥ λ ¬t → inj₂ λ a → ¬t (inj₁ a)
+
+PL→DNE : PL → DNE
+PL→DNE h A ¬¬a = h A ⊥ λ ¬a → absurd (¬¬a ¬a)
+
 ```
 
 
@@ -394,6 +480,12 @@ of two stable formulas is stable.
 
 ```agda
 -- Your code goes here
+Stable-¬ : ∀ {A : Set} → Stable (¬ A)
+Stable-¬ ¬¬¬a = ¬¬¬-elim ¬¬¬a
+
+Stable-× : ∀ {A B : Set} → Stable A → Stable B → Stable (A × B)
+Stable-× sa sb ¬¬ab =
+  sa (λ ¬a → ¬¬ab λ{ (a , _) → ¬a a }) , sb (λ ¬b → ¬¬ab λ{ (_ , b) → ¬b b })
 ```
 
 ## Standard Prelude
