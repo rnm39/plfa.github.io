@@ -350,6 +350,14 @@ reverse of the second appended to the reverse of the first:
 
     reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
 
+```agda
+reverse-++-distrib : ∀ {A : Set} (xs ys : List A)
+    → reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
+reverse-++-distrib [] ys = sym (++-identityʳ (reverse ys))
+reverse-++-distrib (x ∷ xs) ys rewrite reverse-++-distrib xs ys
+  = ++-assoc (reverse ys) (reverse xs) [ x ]
+```
+
 
 #### Exercise `reverse-involutive` (recommended)
 
@@ -358,6 +366,22 @@ as the identity function.  Show that reverse is an involution:
 
     reverse (reverse xs) ≡ xs
 
+```agda
+reverse-involutive : ∀ {A : Set} (xs : List A) → reverse (reverse xs) ≡ xs
+reverse-involutive [] = refl
+reverse-involutive (x ∷ xs) =
+  begin
+    reverse (reverse (x ∷ xs))
+  ≡⟨⟩
+    reverse (reverse xs ++ [ x ])
+  ≡⟨ reverse-++-distrib (reverse xs) [ x ] ⟩
+    reverse [ x ] ++ reverse (reverse xs)
+  ≡⟨⟩
+    x ∷ reverse (reverse xs)
+  ≡⟨ cong (x ∷_) (reverse-involutive xs) ⟩
+    x ∷ xs
+  ∎
+```
 
 ## Faster reverse
 
@@ -526,6 +550,31 @@ The last step of the proof requires extensionality.
 
 ```agda
 -- Your code goes here
+open plfa.part1.Isomorphism using (extensionality)
+
+map-compose : ∀ {A B C : Set} (f : A → B) (g : B → C) → map (g ∘ f) ≡ map g ∘ map f
+map-compose f g = extensionality helper
+  where
+    helper : ∀ {A B C : Set} {f : A → B} {g : B → C} (xs : List A)
+        → map (g ∘ f) xs ≡ (map g ∘ map f) xs
+    helper [] = refl
+    helper {f = f} {g = g} (x ∷ xs) =
+      begin
+        map (g ∘ f) (x ∷ xs)
+          ≡⟨⟩
+        (g ∘ f) x ∷ map (g ∘ f) xs
+          ≡⟨ cong ((g ∘ f) x ∷_) (helper xs) ⟩
+        (g ∘ f) x ∷ (map g ∘ map f) xs
+          ≡⟨⟩
+        g (f x) ∷ map g (map f xs)
+          ≡⟨⟩
+        map g (f x ∷ map f xs)
+          ≡⟨⟩
+        map g (map f (x ∷ xs))
+          ≡⟨⟩
+        (map g ∘ map f) (x ∷ xs)
+      ∎
+
 ```
 
 #### Exercise `map-++-distribute` (practice)
@@ -536,6 +585,10 @@ Prove the following relationship between map and append:
 
 ```agda
 -- Your code goes here
+map-++-distribute : ∀ {A B : Set} (f : A → B) (xs ys : List A)
+    → map f (xs ++ ys) ≡ map f xs ++ map f ys
+map-++-distribute f [] ys = refl
+map-++-distribute f (x ∷ xs) ys = cong (f x ∷_) (map-++-distribute f xs ys)
 ```
 
 #### Exercise `map-Tree` (practice)
@@ -553,6 +606,9 @@ Define a suitable map operator over trees:
 
 ```agda
 -- Your code goes here
+map-Tree : ∀ {A B C D : Set} → (A → C) → (B → D) → Tree A B → Tree C D
+map-Tree f g (leaf a) = leaf (f a)
+map-Tree f g (node t₁ b t₂) = node (map-Tree f g t₁) (g b) (map-Tree f g t₂)
 ```
 
 ## Fold {#Fold}
@@ -635,6 +691,11 @@ For example:
 
 ```agda
 -- Your code goes here
+product : List ℕ → ℕ
+product = foldr _*_ 1
+
+_ : product [ 1 , 2 , 3 , 4 ] ≡ 24
+_ = refl
 ```
 
 #### Exercise `foldr-++` (recommended)
@@ -645,6 +706,10 @@ Show that fold and append are related as follows:
 
 ```agda
 -- Your code goes here
+foldr-++′ : ∀ {A B : Set} (_⊗_ : A → B → B) (e : B) (xs ys : List A)
+    → foldr _⊗_ e (xs ++ ys) ≡ foldr _⊗_ (foldr _⊗_ e ys) xs
+foldr-++′ _⊗_ e [] ys = refl
+foldr-++′ _⊗_ e (x ∷ xs) ys rewrite foldr-++′ _⊗_ e xs ys = refl
 ```
 
 #### Exercise `foldr-∷` (practice)
@@ -660,6 +725,21 @@ Show as a consequence of `foldr-++` above that
 
 ```agda
 -- Your code goes here
+foldr-∷-[] : ∀ {A : Set} (xs : List A) → foldr _∷_ [] xs ≡ xs
+foldr-∷-[] [] = refl
+foldr-∷-[] (x ∷ xs) rewrite foldr-∷-[] xs = refl
+
+foldr-∷ : ∀ {A : Set} (xs ys : List A) → xs ++ ys ≡ foldr _∷_ ys xs
+foldr-∷ xs ys =
+  begin
+    xs ++ ys
+  ≡⟨ sym (foldr-∷-[] (xs ++ ys)) ⟩
+    foldr _∷_ [] (xs ++ ys)
+  ≡⟨ foldr-++′ _∷_ [] xs ys ⟩
+    foldr _∷_ (foldr _∷_ [] ys) xs
+  ≡⟨ cong (λ X → foldr _∷_ X xs) (foldr-∷-[] ys) ⟩
+    foldr _∷_ ys xs
+  ∎
 ```
 
 #### Exercise `map-is-foldr` (practice)
@@ -672,6 +752,13 @@ The proof requires extensionality.
 
 ```agda
 -- Your code goes here
+map-is-foldr : ∀ {A B : Set} (f : A → B) → map f ≡ foldr (λ x xs → f x ∷ xs) []
+map-is-foldr f = extensionality (helper f)
+  where
+    helper : ∀ {A B : Set} (f : A → B) (xs : List A)
+        → map f xs ≡ foldr (λ x xs → f x ∷ xs) [] xs
+    helper f [] = refl
+    helper f (x ∷ xs) rewrite helper f xs = refl
 ```
 
 #### Exercise `fold-Tree` (practice)
@@ -683,6 +770,9 @@ Define a suitable fold function for the type of trees given earlier:
 
 ```agda
 -- Your code goes here
+fold-Tree : ∀ {A B C : Set} → (A → C) → (C → B → C → C) → Tree A B → C
+fold-Tree f g (leaf a) = f a
+fold-Tree f g (node t₁ b t₂) = g (fold-Tree f g t₁) b (fold-Tree f g t₂)
 ```
 
 #### Exercise `map-is-fold-Tree` (practice)
@@ -691,6 +781,14 @@ Demonstrate an analogue of `map-is-foldr` for the type of trees.
 
 ```agda
 -- Your code goes here
+map-is-fold-Tree : ∀ {A B C D : Set} (f : A → C) (g : B → D)
+    → map-Tree f g ≡ fold-Tree (λ a → leaf (f a)) (λ t₁ b t₂ → node t₁ (g b) t₂)
+map-is-fold-Tree f g = extensionality (helper f g)
+  where
+    helper : ∀ {A B C D : Set} (f : A → C) (g : B → D) (t : Tree A B)
+        → map-Tree f g t ≡ fold-Tree (λ a → leaf (f a)) (λ t₁ b t₂ → node t₁ (g b) t₂) t
+    helper f g (leaf a) = refl
+    helper f g (node t₁ b t₂) rewrite helper f g t₁ | helper f g t₂ = refl
 ```
 
 #### Exercise `sum-downFrom` (stretch)
@@ -713,6 +811,31 @@ equal to `n * (n ∸ 1) / 2`:
 
 ```agda
 -- Your code goes here
+open import Data.Nat.Properties using (*-distribˡ-+; *-distribʳ-+; +-∸-assoc; *-comm)
+sum-downFrom : ∀ (n : ℕ) → sum (downFrom n) * 2 ≡ n * (n ∸ 1)
+sum-downFrom zero = refl
+sum-downFrom (suc n) =
+  begin
+    sum (downFrom (suc n)) * 2
+  ≡⟨⟩
+    (n + sum (downFrom n)) * 2
+  ≡⟨ *-distribʳ-+ 2 n _ ⟩
+    n * 2 + sum (downFrom n) * 2
+  ≡⟨ cong ((n * 2) +_) (sum-downFrom n) ⟩
+    n * 2 + n * (n ∸ 1)
+  ≡⟨ sym (*-distribˡ-+ n _ _) ⟩
+    n * (2 + (n ∸ 1))
+  ≡⟨ helper n ⟩
+    n * suc n
+  ≡⟨ *-comm n (suc n) ⟩
+    suc n * n
+  ≡⟨⟩
+    suc n * (suc n ∸ 1)
+  ∎
+  where
+    helper : ∀ (n : ℕ) → n * suc (suc (n ∸ 1)) ≡ n * suc n
+    helper zero = refl
+    helper (suc n) = refl
 ```
 
 ## Monoids
@@ -821,6 +944,9 @@ operations associate to the left rather than the right.  For example:
 
 ```agda
 -- Your code goes here
+foldl : ∀ {A B : Set} → (B → A → B) → B → List A → B
+foldl _⊗_ e [] = e
+foldl _⊗_ e (x ∷ xs) = foldl _⊗_ (e ⊗ x) xs
 ```
 
 
@@ -831,6 +957,31 @@ Show that if `_⊗_` and `e` form a monoid, then `foldr _⊗_ e` and
 
 ```agda
 -- Your code goes here
+foldl-monoid : ∀ {A : Set} (_⊗_ : A → A → A) (e : A) → IsMonoid _⊗_ e →
+  ∀ (xs : List A) (y : A) → foldl _⊗_ y xs ≡ y ⊗ foldl _⊗_ e xs
+foldl-monoid _⊗_ e M [] y = sym (identityʳ M y)
+foldl-monoid _⊗_ e M (x ∷ xs) y =
+  begin
+    foldl _⊗_ y (x ∷ xs)
+  ≡⟨⟩
+    foldl _⊗_ (y ⊗ x) xs
+  ≡⟨ foldl-monoid _⊗_ e M xs (y ⊗ x) ⟩
+    (y ⊗ x) ⊗ foldl _⊗_ e xs
+  ≡⟨ assoc M y x _ ⟩
+    y ⊗ (x ⊗ foldl _⊗_ e xs)
+  ≡⟨ cong (λ X → y ⊗ (X ⊗ _)) (sym (identityˡ M x)) ⟩
+    y ⊗ ((e ⊗ x) ⊗ foldl _⊗_ e xs)
+  ≡⟨ cong (y ⊗_) (sym (foldl-monoid _⊗_ e M xs (e ⊗ x))) ⟩
+    y ⊗ foldl _⊗_ (e ⊗ x) xs
+  ≡⟨⟩
+    y ⊗ foldl _⊗_ e (x ∷ xs)
+  ∎
+
+foldr-monoid-foldl : ∀ {A : Set} (_⊗_ : A → A → A) (e : A) → IsMonoid _⊗_ e →
+  ∀ (xs : List A) → foldr _⊗_ e xs ≡ foldl _⊗_ e xs
+foldr-monoid-foldl _⊗_ e M [] = refl
+foldr-monoid-foldl _⊗_ e M (x ∷ xs) rewrite
+  identityˡ M x | foldl-monoid _⊗_ e M xs x | foldr-monoid-foldl _⊗_ e M xs = refl
 ```
 
 
@@ -949,6 +1100,30 @@ replacement for `_×_`.  As a consequence, demonstrate an equivalence relating
 
 ```agda
 -- Your code goes here
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+
+Any-++-⇔ : ∀ {A : Set} {P : A → Set} (xs ys : List A) →
+  Any P (xs ++ ys) ⇔ (Any P xs ⊎ Any P ys)
+Any-++-⇔ xs ys = record { to = to xs ys ; from = from xs ys }
+  where
+  to : ∀ {A : Set} {P : A → Set} (xs ys : List A) → Any P (xs ++ ys) →
+    Any P xs ⊎ Any P ys
+  to [] ys p = inj₂ p
+  to (x ∷ xs) ys (here p) = inj₁ (here p)
+  to (x ∷ xs) ys (there a) with to xs ys a
+  ... | inj₁ p = inj₁ (there p)
+  ... | inj₂ p = inj₂ p
+
+  from : ∀ {A : Set} {P : A → Set} (xs ys : List A) → Any P xs ⊎ Any P ys →
+    Any P (xs ++ ys)
+  from .(_ ∷ _) ys (inj₁ (here x)) = here x
+  from (x ∷ xs) ys (inj₁ (there p)) = there (from xs ys (inj₁ p))
+  from [] ys (inj₂ p) = p
+  from (x ∷ xs) ys (inj₂ p) = there (from xs ys (inj₂ p))
+
+∈-++-⇔ : ∀ {A : Set} (x : A) (xs ys : List A) → (x ∈ xs ++ ys) ⇔ (x ∈ xs ⊎ x ∈ ys)
+∈-++-⇔ {A} x xs ys = Any-++-⇔ xs ys
+ 
 ```
 
 #### Exercise `All-++-≃` (stretch)
@@ -957,6 +1132,36 @@ Show that the equivalence `All-++-⇔` can be extended to an isomorphism.
 
 ```agda
 -- Your code goes here
+All-++-≃ : ∀ {A : Set} {P : A → Set} (xs ys : List A) →
+  All P (xs ++ ys) ≃ All P xs × All P ys
+All-++-≃ xs ys = record
+  { to = to xs ys
+  ; from = from xs ys
+  ; from∘to = from∘to xs ys
+  ; to∘from = to∘from xs ys
+  }
+  where
+  to : ∀ {A : Set} {P : A → Set} (xs ys : List A) → All P (xs ++ ys) → All P xs × All P ys
+  to [] ys Pxsys = ⟨ [] , Pxsys ⟩
+  to (x ∷ xs) ys (Px ∷ Pxsys) with to xs ys Pxsys
+  ... | ⟨ Pxs , Pys ⟩ = ⟨ Px ∷ Pxs , Pys ⟩
+
+  from : ∀ {A : Set} {P : A → Set} (xs ys : List A) → All P xs × All P ys → All P (xs ++ ys)
+  from .[] ys ⟨ [] , Pys ⟩ = Pys
+  from (x ∷ xs) ys ⟨ Px ∷ Pxs , Pys ⟩ = Px ∷ from xs ys ⟨ Pxs , Pys ⟩
+
+  from∘to : ∀ {A : Set} {P : A → Set} (xs ys : List A) → (Pxsys : All P (xs ++ ys)) →
+    from xs ys (to xs ys Pxsys) ≡ Pxsys
+  from∘to [] ys Pxsys = refl
+  from∘to (x ∷ xs) ys (Px ∷ Pxsys) with to xs ys Pxsys | from∘to xs ys Pxsys
+  ... | ⟨ Pxs , Pys ⟩ | refl = refl
+
+  to∘from : ∀ {A : Set} {P : A → Set} (xs ys : List A) → (PxsPys : All P xs × All P ys) →
+    to xs ys (from xs ys PxsPys) ≡ PxsPys
+  to∘from .[] ys ⟨ [] , Pys ⟩ = refl
+  to∘from (x ∷ xs) ys ⟨ Px ∷ Pxs , Pys ⟩
+    with to xs ys (from xs ys ⟨ Pxs , Pys ⟩) | to∘from xs ys ⟨ Pxs , Pys ⟩
+  ... | ⟨ _ , _ ⟩ | refl = refl
 ```
 
 #### Exercise `¬Any⇔All¬` (recommended)
@@ -978,6 +1183,17 @@ If so, prove; if not, explain why.
 
 ```agda
 -- Your code goes here
+¬Any→All¬ : ∀ {A} {P} (xs : List A) → ¬ Any P xs → All (¬_ ∘ P) xs
+¬Any→All¬ [] ¬AnyP = []
+¬Any→All¬ (x ∷ xs) ¬AnyP = (λ x → ¬AnyP (here x)) ∷ ¬Any→All¬ xs (λ a → ¬AnyP (there a))
+
+All¬→¬Any : ∀ {A} {P} (xs : List A) → All (¬_ ∘ P) xs → ¬ Any P xs
+All¬→¬Any .(_ ∷ _) (¬Px ∷ _) (here Px) = ¬Px Px
+All¬→¬Any (_ ∷ xs) (_ ∷ All¬P) (there AnyP) = All¬→¬Any xs All¬P AnyP
+  
+¬Any⇔All¬ : ∀ {A : Set} {P : A → Set} (xs : List A) →
+  (¬ Any P xs) ⇔ All (¬_ ∘ P) xs
+¬Any⇔All¬ xs = record { to = ¬Any→All¬ xs ; from = All¬→¬Any xs }
 ```
 
 #### Exercise `¬Any≃All¬` (stretch)
@@ -987,6 +1203,24 @@ You will need to use extensionality.
 
 ```agda
 -- Your code goes here
+
+open import plfa.part1.Decidable using (absurd)
+
+≡-¬ : ∀ {A} (x y : ¬ A) → x ≡ y
+≡-¬ x y = extensionality λ a → absurd (x a)
+  
+¬Any≃All¬ : ∀ {A} {P} (xs : List A) → (¬ Any P xs) ≃ All (¬_ ∘ P) xs
+¬Any≃All¬ xs = record
+  { to = ¬Any→All¬ xs
+  ; from = All¬→¬Any xs
+  ; from∘to = λ _ → ≡-¬ _ _
+  ; to∘from = to∘from xs
+  }
+  where
+  to∘from : ∀ {A} {P} (xs : List A) (All¬P : All (¬_ ∘ P) xs) →
+    ¬Any→All¬ xs (All¬→¬Any xs All¬P) ≡ All¬P
+  to∘from .[] [] = refl
+  to∘from (x ∷ xs) (¬Px ∷ All¬P) rewrite to∘from xs All¬P = refl
 ```
 
 #### Exercise `All-∀` (practice)
@@ -995,6 +1229,39 @@ Show that `All P xs` is isomorphic to `∀ x → x ∈ xs → P x`.
 
 ```agda
 -- You code goes here
+open import plfa.part1.Isomorphism using (∀-extensionality)
+
+All-∀ : ∀ {A} {P} (xs : List A) → All P xs ≃ (∀ x → x ∈ xs → P x)
+All-∀ xs = record
+  { to = to
+  ; from = from
+  ; from∘to = from∘to xs
+  ; to∘from = to∘from xs
+  }
+  where
+  to : ∀ {A} {P} {xs : List A} → All P xs → ∀ x → x ∈ xs → P x
+  to (Px ∷ Pxs) x (here refl) = Px
+  to (Px ∷ Pxs) x (there x∈xs) = to Pxs x x∈xs
+
+  from : ∀ {A} {P} {xs : List A} → (∀ x → x ∈ xs → P x) → All P xs
+  from {xs = []} f = []
+  from {xs = x ∷ xs} f = f x (here refl) ∷ from (λ x x∈xs → f x (there x∈xs))
+
+  from∘to : ∀ {A} {P} (xs : List A) → (Pxs : All P xs) →
+    from (to Pxs) ≡ Pxs
+  from∘to .[] [] = refl
+  from∘to (x ∷ xs) (Px ∷ Pxs) rewrite from∘to xs Pxs = refl
+
+  to∘from : ∀ {A} {P : A → Set} (xs : List A) → (f : ∀ x → x ∈ xs → P x) →
+    to (from f) ≡ f
+  to∘from xs f = ∀-extensionality (λ x → extensionality (λ x∈xs → helper xs f x x∈xs))
+    where
+    helper : ∀ {A} {P : A → Set} (xs : List A) (f : ∀ x → x ∈ xs → P x) →
+      ∀ (x : A) (x∈xs : x ∈ xs) → to (from f) x x∈xs ≡ f x x∈xs
+    helper (x ∷ xs) f y (here refl) = refl
+    helper (x ∷ xs) f y (there x∈xs)
+      rewrite helper xs (λ x x∈xs → f x (there x∈xs)) y x∈xs = refl
+
 ```
 
 
@@ -1004,6 +1271,33 @@ Show that `Any P xs` is isomorphic to `∃[ x ] (x ∈ xs × P x)`.
 
 ```agda
 -- You code goes here
+Any-∃ : ∀ {A} {P} (xs : List A) → Any P xs ≃ (∃[ x ] (x ∈ xs × P x))
+Any-∃ xs = record
+  { to = to xs
+  ; from = from xs
+  ; from∘to = from∘to xs
+  ; to∘from = to∘from xs
+  }
+  where
+  to : ∀ {A} {P} (xs : List A) → Any P xs → (∃[ x ] (x ∈ xs × P x))
+  to (x ∷ xs) (here Px) = ⟨ x , ⟨ here refl , Px ⟩ ⟩
+  to (x ∷ xs) (there Pxs) with to xs Pxs
+  ... | ⟨ y , ⟨ y∈xs , Py ⟩ ⟩ = ⟨ y , ⟨ there y∈xs , Py ⟩ ⟩
+
+  from : ∀ {A} {P} (xs : List A) → (∃[ x ] (x ∈ xs × P x)) → Any P xs
+  from (x ∷ xs) ⟨ y , ⟨ here refl , Py ⟩ ⟩ = here Py
+  from (x ∷ xs) ⟨ y , ⟨ there y∈xs , Py ⟩ ⟩ = there (from xs ⟨ y , ⟨ y∈xs , Py ⟩ ⟩)
+
+  from∘to : ∀ {A} {P} (xs : List A) (Pxs : Any P xs) → from xs (to xs Pxs) ≡ Pxs
+  from∘to (x ∷ xs) (here Px) = refl
+  from∘to (x ∷ xs) (there Pxs) rewrite from∘to xs Pxs = refl
+
+  to∘from : ∀ {A} {P : A → Set} (xs : List A) (f : ∃[ x ] (x ∈ xs × P x)) →
+    to xs (from xs f) ≡ f
+  to∘from (x ∷ xs) ⟨ y , ⟨ here refl , Py ⟩ ⟩ = refl
+  to∘from {P = P} (x ∷ xs) ⟨ y , ⟨ there y∈xs , Py ⟩ ⟩
+    rewrite to∘from {P = P} xs ⟨ y , ⟨ y∈xs , Py ⟩ ⟩ = refl
+
 ```
 
 
@@ -1054,6 +1348,12 @@ for some element of a list.  Give their definitions.
 
 ```agda
 -- Your code goes here
+Any? : ∀ {A : Set} {P : A → Set} → Decidable P → Decidable (Any P)
+Any? P? [] = no (λ ())
+Any? P? (x ∷ xs) with P? x | Any? P? xs
+... | yes Px | _ = yes (here Px)
+... | no ¬Px | yes Pxs = yes (there Pxs)
+... | no ¬Px | no ¬Pxs = no λ { (here Px) → ¬Px Px ; (there Pxs) → ¬Pxs Pxs }
 ```
 
 
@@ -1100,6 +1400,14 @@ with their corresponding proofs.
 
 ```agda
 -- Your code goes here
+split : ∀ {A} {P} (P? : Decidable P) (zs : List A) →
+  ∃[ xs ] ∃[ ys ] (merge xs ys zs × All P xs × All (¬_ ∘ P) ys)
+split P? [] = ⟨ [] , ⟨ [] , ⟨ [] , ⟨ [] , [] ⟩ ⟩ ⟩ ⟩
+split P? (z ∷ zs) with P? z | split P? zs
+... | yes Pz | ⟨ xs , ⟨ ys , ⟨ Mxyz , ⟨ Pxs , ¬Pys ⟩ ⟩ ⟩ ⟩
+  = ⟨ z ∷ xs , ⟨ ys , ⟨ left-∷ Mxyz , ⟨ Pz ∷ Pxs , ¬Pys ⟩ ⟩ ⟩ ⟩
+... | no ¬Pz | ⟨ xs , ⟨ ys , ⟨ Mxyz , ⟨ Pxs , ¬Pys ⟩ ⟩ ⟩ ⟩
+  = ⟨ xs , ⟨ z ∷ ys , ⟨ right-∷ Mxyz , ⟨ Pxs , ¬Pz ∷ ¬Pys ⟩ ⟩ ⟩ ⟩
 ```
 
 ## Standard Library
