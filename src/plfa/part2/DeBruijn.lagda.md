@@ -509,6 +509,8 @@ de Bruijn representation.
 
 ```agda
 -- Your code goes here
+mul : ∀ {Γ} → Γ ⊢ `ℕ ⇒ `ℕ ⇒ `ℕ
+mul = μ ƛ ƛ (case (# 1) `zero (plus · # 1 · (# 3 · # 0 · # 1)))
 ```
 
 
@@ -994,6 +996,14 @@ values.
 
 ```agda
 -- Your code goes here
+V¬—→ : ∀ {Γ A} (M : Γ ⊢ A) → Value M → ∀ {N} → ¬ (M —→ N)
+V¬—→ (` _) () _
+V¬—→ (ƛ _) _ ()
+V¬—→ (_ · _) () _
+V¬—→ `zero _ ()
+V¬—→ (`suc M) (V-suc V) (ξ-suc M—→N) = V¬—→ M V M—→N
+V¬—→ (case _ _ _) () _
+V¬—→ (μ _) () _
 ```
 
 ## Progress
@@ -1348,6 +1358,14 @@ Using the evaluator, confirm that two times two is four.
 
 ```agda
 -- Your code goes here
+last : ∀ {A} {M : ∅ ⊢ A} → Steps M → ∅ ⊢ A
+last (steps {_} {N} _ _) = N
+
+four : ∀ {Γ} → Γ ⊢ `ℕ
+four = `suc `suc `suc `suc `zero
+
+_ : last (eval (gas 100) (mul · two · two)) ≡ four
+_ = refl
 ```
 
 
