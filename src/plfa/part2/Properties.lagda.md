@@ -156,6 +156,31 @@ that is, the canonical forms are exactly the well-typed values.
 
 ```
 -- Your code goes here
+Canonical-≃ : ∀ {V A} → Canonical V ⦂ A ≃ (∅ ⊢ V ⦂ A) × Value V
+Canonical-≃ =
+  record { to = to ; from = from ; from∘to = from∘to ; to∘from = to∘from }
+  where
+  to : ∀ {V A} → Canonical V ⦂ A → (∅ ⊢ V ⦂ A) × Value V
+  to (C-ƛ x) = ⟨ (⊢ƛ x) , V-ƛ ⟩
+  to C-zero = ⟨ ⊢zero , V-zero ⟩
+  to (C-suc c) with to c
+  ... | ⟨ x , y ⟩ = ⟨ ⊢suc x , V-suc y ⟩
+
+  from : ∀ {V A} → (∅ ⊢ V ⦂ A) × Value V → Canonical V ⦂ A
+  from ⟨ ⊢ƛ x , V-ƛ ⟩ = C-ƛ x
+  from ⟨ ⊢zero , V-zero ⟩ = C-zero
+  from ⟨ ⊢suc x , V-suc v ⟩ with from ⟨ x , v ⟩
+  ... | c = C-suc c
+
+  from∘to : ∀ {V A} (c : Canonical V ⦂ A) → from (to c) ≡ c
+  from∘to (C-ƛ x) = refl
+  from∘to C-zero = refl
+  from∘to (C-suc c) rewrite from∘to c = refl
+
+  to∘from : ∀ {V A} (x : (∅ ⊢ V ⦂ A) × Value V) → to (from x) ≡ x
+  to∘from ⟨ ⊢ƛ x , V-ƛ ⟩ = refl
+  to∘from ⟨ ⊢zero , V-zero ⟩ = refl
+  to∘from ⟨ ⊢suc x , V-suc v ⟩ rewrite to∘from ⟨ x , v ⟩ = refl
 ```
 
 ## Progress
@@ -266,8 +291,8 @@ or introduce subsidiary functions.
 Instead of defining a data type for `Progress M`, we could
 have formulated progress using disjunction and existentials:
 ```agda
-postulate
-  progress′ : ∀ M {A} → ∅ ⊢ M ⦂ A → Value M ⊎ ∃[ N ](M —→ N)
+-- postulate
+progress′ : ∀ M {A} → ∅ ⊢ M ⦂ A → Value M ⊎ ∃[ N ](M —→ N)
 ```
 This leads to a less perspicuous proof.  Instead of the mnemonic `done`
 and `step` we use `inj₁` and `inj₂`, and the term `N` is no longer
@@ -282,6 +307,24 @@ Show that `Progress M` is isomorphic to `Value M ⊎ ∃[ N ](M —→ N)`.
 
 ```agda
 -- Your code goes here
+Progress-≃ : ∀ {M} → Progress M ≃ Value M ⊎ ∃[ N ] M —→ N
+Progress-≃ = record { to = to ; from = from ; from∘to = from∘to ; to∘from = to∘from }
+  where
+  to : ∀ {M} → Progress M → Value M ⊎ ∃[ N ] M —→ N
+  to (step {N} M—→N) = inj₂ ⟨ N , M—→N ⟩
+  to (done v) = inj₁ v
+
+  from : ∀ {M} → (Value M ⊎ ∃[ N ] M —→ N) → Progress M
+  from (inj₁ v) = done v
+  from (inj₂ ⟨ N , M—→N ⟩) = step M—→N
+
+  from∘to : ∀ {M} (p : Progress M) → from (to p) ≡ p
+  from∘to (step {N} M—→N) = refl
+  from∘to (done v) = refl
+
+  to∘from : ∀ {M} (x : Value M ⊎ ∃[ N ] M —→ N) → to (from x) ≡ x
+  to∘from (inj₁ v) = refl
+  to∘from (inj₂ ⟨ N , M—→N ⟩) = refl
 ```
 
 #### Exercise `progress′` (practice)
@@ -291,6 +334,21 @@ proof of `progress` above.
 
 ```agda
 -- Your code goes here
+progress′ (ƛ x ⇒ M) (⊢ƛ ⊢M) = inj₁ V-ƛ
+progress′ (M · N) (⊢M · ⊢N) with progress′ M ⊢M
+... | inj₂ ⟨ M′ , M—→M′ ⟩ = inj₂ ⟨ M′ · N , ξ-·₁ M—→M′ ⟩
+... | inj₁ (V-ƛ {x} {M′}) with progress′ N ⊢N
+... | inj₂ ⟨ N′ , N—→N′ ⟩ = inj₂ ⟨ M · N′ , ξ-·₂ V-ƛ N—→N′ ⟩
+... | inj₁ vN = inj₂ ⟨ M′ [ x := N ] , β-ƛ vN ⟩
+progress′ .`zero ⊢zero = inj₁ V-zero
+progress′ (`suc M) (⊢suc ⊢M) with progress′ M ⊢M
+... | inj₁ vM = inj₁ (V-suc vM)
+... | inj₂ ⟨ M′ , M—→M′ ⟩ = inj₂ ⟨ `suc M′ , ξ-suc M—→M′ ⟩
+progress′ (case M [zero⇒ N |suc x ⇒ L ]) (⊢case ⊢M ⊢N ⊢L) with progress′ M ⊢M
+... | inj₁ V-zero = inj₂ ⟨ N , β-zero ⟩
+... | inj₁ (V-suc {M} vM) = inj₂ ⟨ L [ x := M ] , β-suc vM ⟩
+... | inj₂ ⟨ M′ , M—→M′ ⟩ = inj₂ ⟨ case M′ [zero⇒ N |suc x ⇒ L ] , ξ-case M—→M′ ⟩
+progress′ (μ x ⇒ M) (⊢μ ⊢M) = inj₂ ⟨ M [ x := μ x ⇒ M ] , β-μ ⟩
 ```
 
 #### Exercise `value?` (practice)
@@ -298,8 +356,16 @@ proof of `progress` above.
 Combine `progress` and `—→¬V` to write a program that decides
 whether a well-typed term is a value:
 ```agda
-postulate
-  value? : ∀ {A M} → ∅ ⊢ M ⦂ A → Dec (Value M)
+--postulate
+value? : ∀ {A M} → ∅ ⊢ M ⦂ A → Dec (Value M)
+value? (⊢ƛ ⊢M) = yes V-ƛ
+value? (⊢M · ⊢N) = no λ ()
+value? ⊢zero = yes V-zero
+value? (⊢suc ⊢M) with value? ⊢M
+... | yes vM = yes (V-suc vM)
+... | no ¬vM = no λ { (V-suc vM) → ¬vM vM } 
+value? (⊢case ⊢M ⊢N ⊢L) = no λ ()
+value? (⊢μ ⊢M) = no λ ()
 ```
 
 ## Prelude to preservation
@@ -740,6 +806,31 @@ preserves types.
 
 ```agda
 -- Your code goes here
+subst!′ : ∀ {Γ x y V N A B C}
+  → ∅ ⊢ V ⦂ A
+  → Γ , x ⦂ A , y ⦂ B ⊢ N ⦂ C
+  → Γ , y ⦂ B ⊢ N [ y ! x := V ] ⦂ C
+
+subst′ : ∀ {Γ x V N A B}
+  → ∅ ⊢ V ⦂ A
+  → Γ , x ⦂ A ⊢ N ⦂ B
+  → Γ ⊢ N [ x := V ]′ ⦂ B
+subst′ {x = x} ⊢V (⊢` Z) with x ≟ x
+... | yes x≡x = weaken ⊢V
+... | no ¬x≡x = ⊥-elim (¬x≡x refl)
+subst′ {x = x} ⊢V (⊢` {x = y} (S y≢x Γ∋y)) with y ≟ x
+... | yes y≡x = ⊥-elim (y≢x y≡x)
+... | no ¬y≡x = ⊢` Γ∋y
+subst′ ⊢V (⊢ƛ ⊢N) = ⊢ƛ (subst!′ ⊢V ⊢N)
+subst′ ⊢V (⊢M · ⊢N) = subst′ ⊢V ⊢M · subst′ ⊢V ⊢N
+subst′ ⊢V ⊢zero = ⊢zero
+subst′ ⊢V (⊢suc ⊢N) = ⊢suc (subst′ ⊢V ⊢N)
+subst′ ⊢V (⊢case ⊢L ⊢M ⊢N) = ⊢case (subst′ ⊢V ⊢L) (subst′ ⊢V ⊢M) (subst!′ ⊢V ⊢N)
+subst′ ⊢V (⊢μ ⊢N) = ⊢μ (subst!′ ⊢V ⊢N)
+
+subst!′ {x = x} {y = y} ⊢V ⊢N with y ≟ x
+... | yes y≡x rewrite y≡x = drop ⊢N
+... | no ¬y≡x = subst′ ⊢V (swap ¬y≡x ⊢N)
 ```
 
 
@@ -1229,6 +1320,942 @@ Using the evaluator, confirm that two times two is four.
 
 ```agda
 -- Your code goes here
+⊢2*2 : ∅ ⊢ mul · two · two ⦂ `ℕ
+⊢2*2 = ⊢mul · ⊢two · ⊢two
+
+_ : eval (gas 100) ⊢2*2 ≡ (
+  steps
+  ((μ "*" ⇒
+  (ƛ "m" ⇒
+   (ƛ "n" ⇒
+    case ` "m" [zero⇒ `zero |suc "m" ⇒
+    (μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "n"
+    · (` "*" · ` "m" · ` "n")
+    ])))
+ · `suc (`suc `zero)
+ · `suc (`suc `zero)
+ —→⟨ ξ-·₁ (ξ-·₁ β-μ) ⟩
+ (ƛ "m" ⇒
+  (ƛ "n" ⇒
+   case ` "m" [zero⇒ `zero |suc "m" ⇒
+   (μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "n"
+   ·
+   ((μ "*" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ `zero |suc "m" ⇒
+       (μ "+" ⇒
+        (ƛ "m" ⇒
+         (ƛ "n" ⇒
+          case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+          ])))
+       · ` "n"
+       · (` "*" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ]))
+ · `suc (`suc `zero)
+ · `suc (`suc `zero)
+ —→⟨ ξ-·₁ (β-ƛ (V-suc (V-suc V-zero))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ `zero |suc "m" ⇒
+  (μ "+" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+     ])))
+  · ` "n"
+  ·
+  ((μ "*" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ `zero |suc "m" ⇒
+      (μ "+" ⇒
+       (ƛ "m" ⇒
+        (ƛ "n" ⇒
+         case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+         ])))
+      · ` "n"
+      · (` "*" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ · `suc (`suc `zero)
+ —→⟨ β-ƛ (V-suc (V-suc V-zero)) ⟩
+ case `suc (`suc `zero) [zero⇒ `zero |suc "m" ⇒
+ (μ "+" ⇒
+  (ƛ "m" ⇒
+   (ƛ "n" ⇒
+    case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+    ])))
+ · `suc (`suc `zero)
+ ·
+ ((μ "*" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ `zero |suc "m" ⇒
+     (μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "n"
+     · (` "*" · ` "m" · ` "n")
+     ])))
+  · ` "m"
+  · `suc (`suc `zero))
+ ]
+ —→⟨ β-suc (V-suc V-zero) ⟩
+ (μ "+" ⇒
+  (ƛ "m" ⇒
+   (ƛ "n" ⇒
+    case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+    ])))
+ · `suc (`suc `zero)
+ ·
+ ((μ "*" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ `zero |suc "m" ⇒
+     (μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "n"
+     · (` "*" · ` "m" · ` "n")
+     ])))
+  · `suc `zero
+  · `suc (`suc `zero))
+ —→⟨ ξ-·₁ (ξ-·₁ β-μ) ⟩
+ (ƛ "m" ⇒
+  (ƛ "n" ⇒
+   case ` "m" [zero⇒ ` "n" |suc "m" ⇒
+   `suc
+   ((μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ]))
+ · `suc (`suc `zero)
+ ·
+ ((μ "*" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ `zero |suc "m" ⇒
+     (μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "n"
+     · (` "*" · ` "m" · ` "n")
+     ])))
+  · `suc `zero
+  · `suc (`suc `zero))
+ —→⟨ ξ-·₁ (β-ƛ (V-suc (V-suc V-zero))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((μ "*" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ `zero |suc "m" ⇒
+     (μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "n"
+     · (` "*" · ` "m" · ` "n")
+     ])))
+  · `suc `zero
+  · `suc (`suc `zero))
+ —→⟨ ξ-·₂ V-ƛ (ξ-·₁ (ξ-·₁ β-μ)) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((ƛ "m" ⇒
+   (ƛ "n" ⇒
+    case ` "m" [zero⇒ `zero |suc "m" ⇒
+    (μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "n"
+    ·
+    ((μ "*" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ `zero |suc "m" ⇒
+        (μ "+" ⇒
+         (ƛ "m" ⇒
+          (ƛ "n" ⇒
+           case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+           ])))
+        · ` "n"
+        · (` "*" · ` "m" · ` "n")
+        ])))
+     · ` "m"
+     · ` "n")
+    ]))
+  · `suc `zero
+  · `suc (`suc `zero))
+ —→⟨ ξ-·₂ V-ƛ (ξ-·₁ (β-ƛ (V-suc V-zero))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((ƛ "n" ⇒
+   case `suc `zero [zero⇒ `zero |suc "m" ⇒
+   (μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "n"
+   ·
+   ((μ "*" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ `zero |suc "m" ⇒
+       (μ "+" ⇒
+        (ƛ "m" ⇒
+         (ƛ "n" ⇒
+          case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+          ])))
+       · ` "n"
+       · (` "*" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ])
+  · `suc (`suc `zero))
+ —→⟨ ξ-·₂ V-ƛ (β-ƛ (V-suc (V-suc V-zero))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ case `suc `zero [zero⇒ `zero |suc "m" ⇒
+ (μ "+" ⇒
+  (ƛ "m" ⇒
+   (ƛ "n" ⇒
+    case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+    ])))
+ · `suc (`suc `zero)
+ ·
+ ((μ "*" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ `zero |suc "m" ⇒
+     (μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "n"
+     · (` "*" · ` "m" · ` "n")
+     ])))
+  · ` "m"
+  · `suc (`suc `zero))
+ ]
+ —→⟨ ξ-·₂ V-ƛ (β-suc V-zero) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((μ "+" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+     ])))
+  · `suc (`suc `zero)
+  ·
+  ((μ "*" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ `zero |suc "m" ⇒
+      (μ "+" ⇒
+       (ƛ "m" ⇒
+        (ƛ "n" ⇒
+         case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+         ])))
+      · ` "n"
+      · (` "*" · ` "m" · ` "n")
+      ])))
+   · `zero
+   · `suc (`suc `zero)))
+ —→⟨ ξ-·₂ V-ƛ (ξ-·₁ (ξ-·₁ β-μ)) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((ƛ "m" ⇒
+   (ƛ "n" ⇒
+    case ` "m" [zero⇒ ` "n" |suc "m" ⇒
+    `suc
+    ((μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "m"
+     · ` "n")
+    ]))
+  · `suc (`suc `zero)
+  ·
+  ((μ "*" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ `zero |suc "m" ⇒
+      (μ "+" ⇒
+       (ƛ "m" ⇒
+        (ƛ "n" ⇒
+         case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+         ])))
+      · ` "n"
+      · (` "*" · ` "m" · ` "n")
+      ])))
+   · `zero
+   · `suc (`suc `zero)))
+ —→⟨ ξ-·₂ V-ƛ (ξ-·₁ (β-ƛ (V-suc (V-suc V-zero)))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((ƛ "n" ⇒
+   case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+   `suc
+   ((μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ])
+  ·
+  ((μ "*" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ `zero |suc "m" ⇒
+      (μ "+" ⇒
+       (ƛ "m" ⇒
+        (ƛ "n" ⇒
+         case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+         ])))
+      · ` "n"
+      · (` "*" · ` "m" · ` "n")
+      ])))
+   · `zero
+   · `suc (`suc `zero)))
+ —→⟨ ξ-·₂ V-ƛ (ξ-·₂ V-ƛ (ξ-·₁ (ξ-·₁ β-μ))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((ƛ "n" ⇒
+   case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+   `suc
+   ((μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ])
+  ·
+  ((ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ `zero |suc "m" ⇒
+     (μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "n"
+     ·
+     ((μ "*" ⇒
+       (ƛ "m" ⇒
+        (ƛ "n" ⇒
+         case ` "m" [zero⇒ `zero |suc "m" ⇒
+         (μ "+" ⇒
+          (ƛ "m" ⇒
+           (ƛ "n" ⇒
+            case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+            ])))
+         · ` "n"
+         · (` "*" · ` "m" · ` "n")
+         ])))
+      · ` "m"
+      · ` "n")
+     ]))
+   · `zero
+   · `suc (`suc `zero)))
+ —→⟨ ξ-·₂ V-ƛ (ξ-·₂ V-ƛ (ξ-·₁ (β-ƛ V-zero))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((ƛ "n" ⇒
+   case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+   `suc
+   ((μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ])
+  ·
+  ((ƛ "n" ⇒
+    case `zero [zero⇒ `zero |suc "m" ⇒
+    (μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "n"
+    ·
+    ((μ "*" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ `zero |suc "m" ⇒
+        (μ "+" ⇒
+         (ƛ "m" ⇒
+          (ƛ "n" ⇒
+           case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+           ])))
+        · ` "n"
+        · (` "*" · ` "m" · ` "n")
+        ])))
+     · ` "m"
+     · ` "n")
+    ])
+   · `suc (`suc `zero)))
+ —→⟨ ξ-·₂ V-ƛ (ξ-·₂ V-ƛ (β-ƛ (V-suc (V-suc V-zero)))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((ƛ "n" ⇒
+   case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+   `suc
+   ((μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ])
+  ·
+  case `zero [zero⇒ `zero |suc "m" ⇒
+  (μ "+" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+     ])))
+  · `suc (`suc `zero)
+  ·
+  ((μ "*" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ `zero |suc "m" ⇒
+      (μ "+" ⇒
+       (ƛ "m" ⇒
+        (ƛ "n" ⇒
+         case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+         ])))
+      · ` "n"
+      · (` "*" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · `suc (`suc `zero))
+  ])
+ —→⟨ ξ-·₂ V-ƛ (ξ-·₂ V-ƛ β-zero) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ ((ƛ "n" ⇒
+   case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+   `suc
+   ((μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ])
+  · `zero)
+ —→⟨ ξ-·₂ V-ƛ (β-ƛ V-zero) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ case `suc (`suc `zero) [zero⇒ `zero |suc "m" ⇒
+ `suc
+ ((μ "+" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+     ])))
+  · ` "m"
+  · `zero)
+ ]
+ —→⟨ ξ-·₂ V-ƛ (β-suc (V-suc V-zero)) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ `suc
+ ((μ "+" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+     ])))
+  · `suc `zero
+  · `zero)
+ —→⟨ ξ-·₂ V-ƛ (ξ-suc (ξ-·₁ (ξ-·₁ β-μ))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ `suc
+ ((ƛ "m" ⇒
+   (ƛ "n" ⇒
+    case ` "m" [zero⇒ ` "n" |suc "m" ⇒
+    `suc
+    ((μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "m"
+     · ` "n")
+    ]))
+  · `suc `zero
+  · `zero)
+ —→⟨ ξ-·₂ V-ƛ (ξ-suc (ξ-·₁ (β-ƛ (V-suc V-zero)))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ `suc
+ ((ƛ "n" ⇒
+   case `suc `zero [zero⇒ ` "n" |suc "m" ⇒
+   `suc
+   ((μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ])
+  · `zero)
+ —→⟨ ξ-·₂ V-ƛ (ξ-suc (β-ƛ V-zero)) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ `suc
+ case `suc `zero [zero⇒ `zero |suc "m" ⇒
+ `suc
+ ((μ "+" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+     ])))
+  · ` "m"
+  · `zero)
+ ]
+ —→⟨ ξ-·₂ V-ƛ (ξ-suc (β-suc V-zero)) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ `suc
+ (`suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · `zero
+   · `zero))
+ —→⟨ ξ-·₂ V-ƛ (ξ-suc (ξ-suc (ξ-·₁ (ξ-·₁ β-μ)))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ `suc
+ (`suc
+  ((ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒
+     `suc
+     ((μ "+" ⇒
+       (ƛ "m" ⇒
+        (ƛ "n" ⇒
+         case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+         ])))
+      · ` "m"
+      · ` "n")
+     ]))
+   · `zero
+   · `zero))
+ —→⟨ ξ-·₂ V-ƛ (ξ-suc (ξ-suc (ξ-·₁ (β-ƛ V-zero)))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ `suc
+ (`suc
+  ((ƛ "n" ⇒
+    case `zero [zero⇒ ` "n" |suc "m" ⇒
+    `suc
+    ((μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "m"
+     · ` "n")
+    ])
+   · `zero))
+ —→⟨ ξ-·₂ V-ƛ (ξ-suc (ξ-suc (β-ƛ V-zero))) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ ·
+ `suc
+ (`suc
+  case `zero [zero⇒ `zero |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · `zero)
+  ])
+ —→⟨ ξ-·₂ V-ƛ (ξ-suc (ξ-suc β-zero)) ⟩
+ (ƛ "n" ⇒
+  case `suc (`suc `zero) [zero⇒ ` "n" |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · ` "n")
+  ])
+ · `suc (`suc `zero)
+ —→⟨ β-ƛ (V-suc (V-suc V-zero)) ⟩
+ case `suc (`suc `zero) [zero⇒ `suc (`suc `zero) |suc "m" ⇒
+ `suc
+ ((μ "+" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+     ])))
+  · ` "m"
+  · `suc (`suc `zero))
+ ]
+ —→⟨ β-suc (V-suc V-zero) ⟩
+ `suc
+ ((μ "+" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+     ])))
+  · `suc `zero
+  · `suc (`suc `zero))
+ —→⟨ ξ-suc (ξ-·₁ (ξ-·₁ β-μ)) ⟩
+ `suc
+ ((ƛ "m" ⇒
+   (ƛ "n" ⇒
+    case ` "m" [zero⇒ ` "n" |suc "m" ⇒
+    `suc
+    ((μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "m"
+     · ` "n")
+    ]))
+  · `suc `zero
+  · `suc (`suc `zero))
+ —→⟨ ξ-suc (ξ-·₁ (β-ƛ (V-suc V-zero))) ⟩
+ `suc
+ ((ƛ "n" ⇒
+   case `suc `zero [zero⇒ ` "n" |suc "m" ⇒
+   `suc
+   ((μ "+" ⇒
+     (ƛ "m" ⇒
+      (ƛ "n" ⇒
+       case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+       ])))
+    · ` "m"
+    · ` "n")
+   ])
+  · `suc (`suc `zero))
+ —→⟨ ξ-suc (β-ƛ (V-suc (V-suc V-zero))) ⟩
+ `suc
+ case `suc `zero [zero⇒ `suc (`suc `zero) |suc "m" ⇒
+ `suc
+ ((μ "+" ⇒
+   (ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+     ])))
+  · ` "m"
+  · `suc (`suc `zero))
+ ]
+ —→⟨ ξ-suc (β-suc V-zero) ⟩
+ `suc
+ (`suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · `zero
+   · `suc (`suc `zero)))
+ —→⟨ ξ-suc (ξ-suc (ξ-·₁ (ξ-·₁ β-μ))) ⟩
+ `suc
+ (`suc
+  ((ƛ "m" ⇒
+    (ƛ "n" ⇒
+     case ` "m" [zero⇒ ` "n" |suc "m" ⇒
+     `suc
+     ((μ "+" ⇒
+       (ƛ "m" ⇒
+        (ƛ "n" ⇒
+         case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+         ])))
+      · ` "m"
+      · ` "n")
+     ]))
+   · `zero
+   · `suc (`suc `zero)))
+ —→⟨ ξ-suc (ξ-suc (ξ-·₁ (β-ƛ V-zero))) ⟩
+ `suc
+ (`suc
+  ((ƛ "n" ⇒
+    case `zero [zero⇒ ` "n" |suc "m" ⇒
+    `suc
+    ((μ "+" ⇒
+      (ƛ "m" ⇒
+       (ƛ "n" ⇒
+        case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+        ])))
+     · ` "m"
+     · ` "n")
+    ])
+   · `suc (`suc `zero)))
+ —→⟨ ξ-suc (ξ-suc (β-ƛ (V-suc (V-suc V-zero)))) ⟩
+ `suc
+ (`suc
+  case `zero [zero⇒ `suc (`suc `zero) |suc "m" ⇒
+  `suc
+  ((μ "+" ⇒
+    (ƛ "m" ⇒
+     (ƛ "n" ⇒
+      case ` "m" [zero⇒ ` "n" |suc "m" ⇒ `suc (` "+" · ` "m" · ` "n")
+      ])))
+   · ` "m"
+   · `suc (`suc `zero))
+  ])
+ —→⟨ ξ-suc (ξ-suc β-zero) ⟩ `suc (`suc (`suc (`suc `zero))) ∎)
+ (done (V-suc (V-suc (V-suc (V-suc V-zero))))))
+_ = refl
 ```
 
 
@@ -1239,6 +2266,8 @@ and preservation theorems for the simply typed lambda-calculus.
 
 ```agda
 -- Your code goes here
+-- progress : ∀ {A M} → ∅ ⊢ M ⦂ A → Value M ⊎ ∃[ N ] M —→ N
+-- preservation : ∀ {A M N} → M —→ N → ∅ ⊢ M ⦂ A → ∅ ⊢ N ⦂ A
 ```
 
 
@@ -1255,6 +2284,20 @@ with case expressions and one not involving case expressions.
 
 ```agda
 -- Your code goes here
+module _ where
+  CE : Term → Term → Type → Set
+  CE M N A = M —→ N × ∅ ⊢ N ⦂ A × ¬ (∅ ⊢ M ⦂ A)
+
+  ok err : Term
+  ok = `zero
+  err = `zero · `zero
+  A = `ℕ
+
+  _ : CE (case `zero [zero⇒ ok |suc "m" ⇒ err ]) ok A
+  _ = ⟨ β-zero , ⟨ ⊢zero , (λ { (⊢case _ _ (() · _))}) ⟩ ⟩
+
+  _ : CE ((ƛ "x" ⇒ ok) · (ƛ "x" ⇒ err)) ok A
+  _ = ⟨ (β-ƛ V-ƛ) , ⟨ ⊢zero , (λ { (_ · ⊢ƛ (() · _))}) ⟩ ⟩
 ```
 
 
@@ -1274,8 +2317,8 @@ Stuck M  =  Normal M × ¬ Value M
 
 Using progress, it is easy to show that no well-typed term is stuck:
 ```agda
-postulate
-  unstuck : ∀ {M A}
+--postulate
+unstuck : ∀ {M A}
     → ∅ ⊢ M ⦂ A
       -----------
     → ¬ (Stuck M)
@@ -1284,8 +2327,8 @@ postulate
 Using preservation, it is easy to show that after any number of steps,
 a well-typed term remains well typed:
 ```agda
-postulate
-  preserves : ∀ {M N A}
+--postulate
+preserves : ∀ {M N A}
     → ∅ ⊢ M ⦂ A
     → M —↠ N
       ---------
@@ -1295,8 +2338,8 @@ postulate
 An easy consequence is that starting from a well-typed term, taking
 any number of reduction steps leads to a term that is not stuck:
 ```agda
-postulate
-  wttdgs : ∀ {M N A}
+--postulate
+wttdgs : ∀ {M N A}
     → ∅ ⊢ M ⦂ A
     → M —↠ N
       -----------
@@ -1315,6 +2358,8 @@ Give an example of an ill-typed term that does get stuck.
 
 ```agda
 -- Your code goes here
+_ : Stuck (`zero · `zero)
+_ = ⟨ (λ { (ξ-·₁ ()) ; (ξ-·₂ V-zero ()) }) , (λ ()) ⟩
 ```
 
 #### Exercise `unstuck` (recommended)
@@ -1323,6 +2368,14 @@ Provide proofs of the three postulates, `unstuck`, `preserves`, and `wttdgs` abo
 
 ```agda
 -- Your code goes here
+unstuck ⊢M ⟨ ¬M—→ , ¬vM ⟩ with progress ⊢M
+... | step M—→N = ¬M—→ M—→N
+... | done vM = ¬vM vM
+
+preserves ⊢M (_ ∎) = ⊢M
+preserves ⊢L (L —→⟨ L—→M ⟩ M—↠N) = preserves (preserve ⊢L L—→M) M—↠N
+
+wttdgs ⊢M M—↠N = unstuck (preserves ⊢M M—↠N)
 ```
 
 ## Reduction is deterministic
@@ -1433,9 +2486,17 @@ false, give a counterexample:
 
   - Determinism
 
+    becomes false
+    ``M = (ƛ "x" ⇒ "x") · `zero``,
+    `M —→ zap` and ``M —→ `zero`` but ``zap ≢ `zero``
+
   - Progress
 
+    becomes false
+    ``∅ ⊢ zap ⦂ `ℕ`` but `¬ (Value zap)` and `¬ ∃[ N ] zap —→ N`
+
   - Preservation
+    remains true
 
 
 #### Quiz
@@ -1456,9 +2517,19 @@ false, give a counterexample:
 
   - Determinism
 
+    becomes false
+    ``M = (ƛ "x" ⇒ ` "x") · `zero``,
+    ``M —→ `zero`` and ``M —→ foo · `zero`` but `` `zero ≢ foo · `zero``
+
   - Progress
 
+    remains true
+
   - Preservation
+
+    becomes false
+    ``M = (ƛ "x" ⇒ ` "x")``,
+    ``∅ ⊢ M ⦂ `ℕ ⇒ `ℕ`` and `M —→ foo` but ``¬ (∅ ⊢ foo ⦂ `ℕ ⇒ `ℕ)``
 
 
 #### Quiz
@@ -1471,9 +2542,17 @@ false, give a counterexample:
 
   - Determinism
 
+    remains true
+
   - Progress
 
+    becomes false
+    ``M = ((ƛ "x" ⇒ ƛ "y" ⇒ `zero) · `zero) · `zero``,
+    ``∅ ⊢ M ⦂ `ℕ`` but `¬ (Value M)` and ``¬ (∃[ N ] M —→ N)``
+
   - Preservation
+
+    remains true
 
 
 #### Quiz
@@ -1503,9 +2582,15 @@ false, give a counterexample:
 
   - Determinism
 
+    remains true
+
   - Progress
 
+    remains true
+
   - Preservation
+
+    remains true
 
 Are all properties preserved in this case? Are there any
 other alterations we would wish to make to the system?
