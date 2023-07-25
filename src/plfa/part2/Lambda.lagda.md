@@ -198,7 +198,7 @@ mul : Term
 mul = μ "*" ⇒ ƛ "m" ⇒ ƛ "n" ⇒
   case ` "m"
     [zero⇒ `zero
-    |suc "m" ⇒ plus · ` "m" · (` "*" · ` "m" · ` "n")
+    |suc "m" ⇒ plus · ` "n" · (` "*" · ` "m" · ` "n")
     ]
 ```
 
@@ -575,16 +575,16 @@ _[_!_:=_] : Term → Id → Id → Term → Term
 ... | yes _ = V
 ... | no _ = ` x
 (ƛ x ⇒ N) [ y := V ]′ = ƛ x ⇒ N [ x ! y := V ]
-(L · M) [ y := V ]′ = L [ y := V ] · M [ y := V ]
+(L · M) [ y := V ]′ = L [ y := V ]′ · M [ y := V ]′
 `zero [ y := V ]′ = `zero
-(`suc M) [ y := V ]′ = `suc M [ y := V ]
+(`suc M) [ y := V ]′ = `suc M [ y := V ]′
 case L [zero⇒ M |suc x ⇒ N ] [ y := V ]′ =
-  case L [ y := V ] [zero⇒ M [ y := V ] |suc x ⇒ N [ x ! y := V ] ]
+  case L [ y := V ]′ [zero⇒ M [ y := V ]′ |suc x ⇒ N [ x ! y := V ] ]
 (μ x ⇒ N) [ y := V ]′ = μ x ⇒ N [ x ! y := V ]
 
 L [ x ! y := V ] with x ≟ y
 ... | yes _ = L
-... | no _ = L [ y := V ]
+... | no _ = L [ y := V ]′
 ```
 
 
@@ -1563,7 +1563,7 @@ showing that it is well typed.
 ⊢mul = ⊢μ (⊢ƛ (⊢ƛ (⊢case
     (⊢` (S′ Z))
     ⊢zero
-    ((⊢plus · (⊢` Z)) · (((⊢` (S′ (S′ (S′ Z)))) · ⊢` Z) · ⊢` (S′ Z)))
+    ((⊢plus · (⊢` (S′ Z))) · (((⊢` (S′ (S′ (S′ Z)))) · ⊢` Z) · ⊢` (S′ Z)))
   )))
 ```
 
