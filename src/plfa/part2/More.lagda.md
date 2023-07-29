@@ -1471,8 +1471,8 @@ Please delimit any code you add as follows:
 Show that a double substitution is equivalent to two single
 substitutions.
 ```agda
-postulate
-  double-subst :
+--postulate
+double-subst :
     ∀ {Γ A B C} {V : Γ ⊢ A} {W : Γ ⊢ B} {N : Γ , A , B ⊢ C} →
       N [ V ][ W ] ≡ (N [ rename S_ W ]) [ V ]
 ```
@@ -1481,7 +1481,599 @@ its context adjusted via renaming in order for the right-hand
 side to be well typed.
 
 ```agda
---double-subst {Γ} {A} {B} {C} {V} {W} {L} = {!!}
+open Eq using (sym; cong)
+open Eq.≡-Reasoning renaming (begin_ to ≡begin_; _∎ to _≡∎)
+
+ext-ext : ∀ {Γ Δ Ε}
+  → (σ : ∀ {A} → Γ ∋ A → Δ ∋ A)
+  → (τ : ∀ {A} → Δ ∋ A → Ε ∋ A)
+  → ∀ {A B} (x : Γ , A ∋ B)
+  → ext τ (ext σ x) ≡ ext (λ v → τ (σ v)) x
+ext-ext σ τ Z = refl
+ext-ext σ τ (S x) = refl
+
+ext-ext-ext-ext : ∀ {Γ Δ Ε}
+  → (σ : ∀ {A} → Γ ∋ A → Δ ∋ A)
+  → (τ : ∀ {A} → Δ ∋ A → Ε ∋ A)
+  → ∀ {A B C} (x : Γ , A , B ∋ C)
+  → ext (ext τ) (ext (ext σ) x) ≡ ext (ext (λ v → τ (σ v))) x
+ext-ext-ext-ext σ τ Z = refl
+ext-ext-ext-ext σ τ (S Z) = refl
+ext-ext-ext-ext σ τ (S (S x)) = refl
+
+cong-ext : ∀ {Γ Δ} {σ τ : ∀ {A} → Γ ∋ A → Δ ∋ A}
+  → (σ~τ : ∀ {A} (x : Γ ∋ A) → σ x ≡ τ x)
+  → ∀ {A B} (x : Γ , A ∋ B)
+  → ext σ x ≡ ext τ x
+cong-ext σ~τ Z = refl
+cong-ext σ~τ (S x) = cong S_ (σ~τ x)
+
+cong-rename : ∀ {Γ Δ} {σ τ : ∀ {A} → Γ ∋ A → Δ ∋ A}
+  → (∀ {A} (x : Γ ∋ A) → σ x ≡ τ x)
+  → ∀ {A} (L : Γ ⊢ A)
+  → rename σ L ≡ rename τ L
+cong-rename σ~τ (` x) = cong `_ (σ~τ x)
+cong-rename σ~τ (ƛ L)
+  rewrite cong-rename (cong-ext σ~τ) L = refl
+cong-rename σ~τ (L · M)
+  rewrite cong-rename σ~τ L | cong-rename σ~τ M = refl
+cong-rename σ~τ `zero = refl
+cong-rename σ~τ (`suc L)
+  rewrite cong-rename σ~τ L = refl
+cong-rename σ~τ (case L M N)
+  rewrite cong-rename σ~τ L | cong-rename σ~τ M | cong-rename (cong-ext σ~τ) N = refl
+cong-rename σ~τ (μ L)
+  rewrite cong-rename (cong-ext σ~τ) L = refl
+cong-rename σ~τ (con x) = refl
+cong-rename σ~τ (L `* M)
+  rewrite cong-rename σ~τ L | cong-rename σ~τ M = refl
+cong-rename σ~τ (`let L M)
+  rewrite cong-rename σ~τ L | cong-rename (cong-ext σ~τ) M = refl
+cong-rename σ~τ `⟨ L , M ⟩
+  rewrite cong-rename σ~τ L | cong-rename σ~τ M = refl
+cong-rename σ~τ (`proj₁ L)
+  rewrite cong-rename σ~τ L = refl
+cong-rename σ~τ (`proj₂ L)
+  rewrite cong-rename σ~τ L = refl
+cong-rename σ~τ (case× L M)
+  rewrite cong-rename σ~τ L | cong-rename (cong-ext (cong-ext σ~τ)) M = refl
+cong-rename σ~τ (`inj₁ L)
+  rewrite cong-rename σ~τ L = refl
+cong-rename σ~τ (`inj₂ L)
+  rewrite cong-rename σ~τ L = refl
+cong-rename σ~τ (case⊎ L M N)
+  rewrite cong-rename σ~τ L | cong-rename (cong-ext σ~τ) M | cong-rename (cong-ext σ~τ) N
+  = refl
+cong-rename σ~τ `tt = refl
+cong-rename σ~τ (case⊤ L M)
+  rewrite cong-rename σ~τ L | cong-rename σ~τ M = refl
+cong-rename σ~τ (case⊥ L)
+  rewrite cong-rename σ~τ L = refl
+cong-rename σ~τ `[] = refl
+cong-rename σ~τ (L `∷ M)
+  rewrite cong-rename σ~τ L | cong-rename σ~τ M = refl
+cong-rename σ~τ (caseL L M N)
+  rewrite cong-rename σ~τ L | cong-rename σ~τ M | cong-rename (cong-ext (cong-ext σ~τ)) N
+  = refl
+
+rename-rename : ∀ {Γ Δ Ε}
+  → (σ : ∀ {A} → Γ ∋ A → Δ ∋ A)
+  → (τ : ∀ {A} → Δ ∋ A → Ε ∋ A)
+  → ∀ {A} (L : Γ ⊢ A)
+  → rename τ (rename σ L) ≡ rename (λ v → τ (σ v)) L
+rename-rename σ τ (` x) = refl
+rename-rename σ τ (ƛ L)
+  rewrite rename-rename (ext σ) (ext τ) L | cong-rename (ext-ext σ τ) L = refl
+rename-rename σ τ (L · M)
+  rewrite rename-rename σ τ L | rename-rename σ τ M = refl
+rename-rename σ τ `zero = refl
+rename-rename σ τ (`suc L)
+  rewrite rename-rename σ τ L = refl
+rename-rename σ τ (case L M N)
+  rewrite rename-rename σ τ L
+  | rename-rename σ τ M
+  | rename-rename (ext σ) (ext τ) N | cong-rename (ext-ext σ τ) N
+  = refl
+rename-rename σ τ (μ L)
+  rewrite rename-rename (ext σ) (ext τ) L | cong-rename (ext-ext σ τ) L = refl
+rename-rename σ τ (con x) = refl
+rename-rename σ τ (L `* M)
+  rewrite rename-rename σ τ L | rename-rename σ τ M = refl
+rename-rename σ τ (`let L M)
+  rewrite rename-rename σ τ L
+  | rename-rename (ext σ) (ext τ) M | cong-rename (ext-ext σ τ) M
+  = refl
+rename-rename σ τ `⟨ L , M ⟩
+  rewrite rename-rename σ τ L | rename-rename σ τ M = refl
+rename-rename σ τ (`proj₁ L)
+  rewrite rename-rename σ τ L = refl
+rename-rename σ τ (`proj₂ L)
+  rewrite rename-rename σ τ L = refl
+rename-rename σ τ (case× L M)
+  rewrite rename-rename σ τ L
+  | rename-rename (ext (ext σ)) (ext (ext τ)) M
+  | cong-rename (λ x → ext-ext-ext-ext σ τ x) M
+  = refl
+rename-rename σ τ (`inj₁ L)
+  rewrite rename-rename σ τ L = refl
+rename-rename σ τ (`inj₂ L)
+  rewrite rename-rename σ τ L = refl
+rename-rename σ τ (case⊎ L M N)
+  rewrite rename-rename σ τ L
+  | rename-rename (ext σ) (ext τ) M | cong-rename (ext-ext σ τ) M
+  | rename-rename (ext σ) (ext τ) N | cong-rename (ext-ext σ τ) N
+  = refl
+rename-rename σ τ `tt = refl
+rename-rename σ τ (case⊤ L M)
+  rewrite rename-rename σ τ L | rename-rename σ τ M = refl
+rename-rename σ τ (case⊥ L)
+  rewrite rename-rename σ τ L = refl
+rename-rename σ τ `[] = refl
+rename-rename σ τ (L `∷ M)
+  rewrite rename-rename σ τ L | rename-rename σ τ M = refl
+rename-rename σ τ (caseL L M N)
+  rewrite rename-rename σ τ L
+  | rename-rename σ τ M
+  | rename-rename (ext (ext σ)) (ext (ext τ)) N
+  | cong-rename (ext-ext-ext-ext σ τ) N
+  = refl
+
+cong-exts : ∀ {Γ Δ} {σ τ : ∀ {A} → Γ ∋ A → Δ ⊢ A}
+  → (∀ {A} (x : Γ ∋ A) → σ x ≡ τ x)
+  → ∀ {A B} (x : Γ , A ∋ B)
+  → exts σ x ≡ exts τ x
+cong-exts σ~τ Z = refl
+cong-exts σ~τ (S x) = cong (rename S_) (σ~τ x)
+
+cong-subst : ∀ {Γ Δ} {σ τ : ∀ {C} → Γ ∋ C → Δ ⊢ C}
+  → (∀ {C} (x : Γ ∋ C) → σ x ≡ τ x)
+  → ∀ {C} (L : Γ ⊢ C)
+  → subst σ L ≡ subst τ L
+cong-subst σ~τ (` x) = σ~τ x
+cong-subst σ~τ (ƛ L)
+  rewrite cong-subst (cong-exts σ~τ) L = refl
+cong-subst σ~τ (L · M)
+  rewrite cong-subst σ~τ L | cong-subst σ~τ M = refl
+cong-subst σ~τ `zero = refl
+cong-subst σ~τ (`suc L)
+  rewrite cong-subst σ~τ L = refl
+cong-subst σ~τ (case L M N)
+  rewrite cong-subst σ~τ L | cong-subst σ~τ M | cong-subst (cong-exts σ~τ) N = refl
+cong-subst σ~τ (μ L)
+  rewrite cong-subst (cong-exts σ~τ) L = refl
+cong-subst σ~τ (con x) = refl
+cong-subst σ~τ (L `* M)
+  rewrite cong-subst σ~τ L | cong-subst σ~τ M = refl
+cong-subst σ~τ (`let L M)
+  rewrite cong-subst σ~τ L | cong-subst (cong-exts σ~τ) M = refl
+cong-subst σ~τ `⟨ L , M ⟩
+  rewrite cong-subst σ~τ L | cong-subst σ~τ M = refl
+cong-subst σ~τ (`proj₁ L)
+  rewrite cong-subst σ~τ L = refl
+cong-subst σ~τ (`proj₂ L)
+  rewrite cong-subst σ~τ L = refl
+cong-subst σ~τ (case× L M)
+  rewrite cong-subst σ~τ L | cong-subst (cong-exts (cong-exts σ~τ)) M = refl
+cong-subst σ~τ (`inj₁ L)
+  rewrite cong-subst σ~τ L = refl
+cong-subst σ~τ (`inj₂ L)
+  rewrite cong-subst σ~τ L = refl
+cong-subst σ~τ (case⊎ L M N)
+  rewrite cong-subst σ~τ L | cong-subst (cong-exts σ~τ) M | cong-subst (cong-exts σ~τ) N
+  = refl
+cong-subst σ~τ `tt = refl
+cong-subst σ~τ (case⊤ L M)
+  rewrite cong-subst σ~τ L | cong-subst σ~τ M = refl
+cong-subst σ~τ (case⊥ L)
+  rewrite cong-subst σ~τ L = refl
+cong-subst σ~τ `[] = refl
+cong-subst σ~τ (L `∷ M)
+  rewrite cong-subst σ~τ L | cong-subst σ~τ M = refl
+cong-subst σ~τ (caseL L M N)
+  rewrite cong-subst σ~τ L | cong-subst σ~τ M | cong-subst (cong-exts (cong-exts σ~τ)) N
+  = refl
+
+subst01 : ∀ {Γ A B C} → Γ ⊢ A → Γ ⊢ B → Γ , A , B ∋ C → Γ ⊢ C
+subst01 V W Z = W
+subst01 V W (S Z) = V
+subst01 V W (S (S x)) = ` x
+
+_++_ : Context → Context → Context
+Γ ++ ∅ = Γ
+Γ ++ (Δ , x) = Γ ++ Δ , x
+
+weak : ∀ {Γ A} (Δ : Context) {B} → Γ ++ Δ ∋ A → (Γ , B) ++ Δ ∋ A
+weak ∅ x = S x
+weak (Δ , y) Z = Z
+weak (Δ , y) (S x) = S (weak Δ x)
+
+extss : ∀ {Γ Δ} (Γ′ : Context) → (∀ {A} → Γ ∋ A → Δ ⊢ A)
+  → ∀ {B}
+  → Γ ++ Γ′ ∋ B
+  → Δ ++ Γ′ ⊢ B
+extss ∅ σ x = σ x
+extss (Γ′ , y) σ Z = ` Z
+extss (Γ′ , y) σ (S x) = rename S_ (extss Γ′ σ x)
+
+_ : ∀ {Γ A B} (x : Γ ∋ A) → weak ∅ {B} x ≡ S x
+_ = λ x → refl
+
+_ : ∀ {Γ A B C} (x : Γ , C ∋ A) → weak (∅ , C) {B} x ≡ ext S_ x
+_ = λ { Z → refl ; (S x) → refl }
+
+_ : ∀ {Γ A B C D} (x : Γ , C , D ∋ A) → weak (∅ , C , D) {B} x ≡ ext (ext S_) x
+_ = λ { Z → refl ; (S Z) → refl ; (S (S x)) → refl }
+
+_ : ∀ {Γ Δ A} (σ : ∀ {C} → Γ ∋ C → Δ ⊢ C) (x : Γ ∋ A) → extss ∅ σ x ≡ σ x
+_ = λ σ x → refl
+
+_ : ∀ {Γ Δ A B} (σ : ∀ {C} → Γ ∋ C → Δ ⊢ C) (x : Γ , B ∋ A) → extss (∅ , B) σ x ≡ exts σ x
+_ = λ σ → λ { Z → refl ; (S x) → refl }
+
+exts-extss : ∀ {Γ Δ A B} (Γ′ : Context) (σ : ∀ {A} → Γ ∋ A → Δ ⊢ A) (x : Γ ++ Γ′ , B ∋ A)
+  → exts (extss Γ′ σ) x ≡ extss (Γ′ , B) σ x
+exts-extss Γ′ σ Z = refl
+exts-extss Γ′ σ (S x) = refl
+
+ext-weak : ∀ {Γ A B} (Δ : Context) {C} (x : Γ ++ Δ , B ∋ A)
+  → ext (weak Δ {C}) x ≡ weak (Δ , B) {C} x
+ext-weak ∅ Z = refl
+ext-weak ∅ (S x) = refl
+ext-weak (Δ , y) Z = refl
+ext-weak (Δ , y) (S x) = refl
+
+extss-substZero-weak : ∀ {Γ A B} (Δ : Context) (V : Γ ⊢ A) (x : Γ ++ Δ ∋ B)
+  → extss Δ (substZero V) (weak Δ x) ≡ ` x
+extss-substZero-weak ∅ V x = refl
+extss-substZero-weak (Δ , D) V Z = refl
+extss-substZero-weak (Δ , D) V (S x)
+  rewrite extss-substZero-weak Δ V x = refl
+
+rename-weak-extss≡extss-exts-weak : ∀ {Γ Γ′} (σ : ∀ {A} → Γ ∋ A → Γ′ ⊢ A) (B : Type)
+  → ∀ (Δ : Context) {A} (x : Γ ++ Δ ∋ A)
+  → rename (weak Δ {B}) (extss Δ σ x) ≡ extss Δ (exts σ) (weak Δ x)
+rename-weak-extss≡extss-exts-weak σ B ∅ x = refl
+rename-weak-extss≡extss-exts-weak σ B (Δ , D) Z = refl
+rename-weak-extss≡extss-exts-weak σ B (Δ , D) (S x) =
+  ≡begin
+    rename (weak (Δ , D)) (rename S_ (extss Δ σ x))
+  ≡⟨ sym (cong-rename (ext-weak Δ) (rename S_ (extss Δ σ x))) ⟩
+    rename (ext (weak Δ)) (rename S_ (extss Δ σ x))
+  ≡⟨ rename-rename S_ (ext (weak Δ)) (extss Δ σ x) ⟩
+    rename (λ x → ext (weak Δ) (S x)) (extss Δ σ x)
+  ≡⟨ cong-rename (λ x → refl) (extss Δ σ x) ⟩
+    rename (λ x → S (weak Δ x)) (extss Δ σ x)
+  ≡⟨ sym (rename-rename (weak Δ) S_ (extss Δ σ x)) ⟩
+    rename S_ (rename (weak Δ) (extss Δ σ x))
+  ≡⟨ cong (rename S_) (rename-weak-extss≡extss-exts-weak σ B Δ x) ⟩
+    rename S_ (extss Δ (exts σ) (weak Δ x))
+  ≡∎
+
+{-
+-- Dependency Tree --
+
+- double-subst
+  - ds
+    - ds1a
+    - ds1b
+    - ds2a
+    - ds2b
+    - dsv
+      - dsvZ
+        - dsvZ1
+        - dsvZ2
+      - dsvh
+        - dsvh1a
+        - dsvh1b
+        - dsvh2a
+        - dsvh2b
+-}
+
+dsvZ1 : ∀ {Γ A B} (Δ : Context) {C} (V : Γ ⊢ A) (W : Γ ++ Δ , C ⊢ B)
+  → subst (exts (extss Δ (substZero V))) (rename (ext (weak Δ)) W)
+    ≡ subst (extss (Δ , C) (substZero V)) (rename (weak (Δ , C)) W)
+dsvZ1 Δ {C} V W
+  rewrite cong-subst (exts-extss Δ (substZero V)) (rename (ext (weak Δ)) W)
+  | cong (subst (extss (Δ , C) (substZero V))) (cong-rename (ext-weak Δ) W)
+  = refl
+
+dsvZ2 : ∀ {Γ A B} (Δ : Context) {C D} (V : Γ ⊢ A) (W : Γ ++ Δ , C , D ⊢ B)
+  → subst (exts (exts (extss Δ (substZero V)))) (rename (ext (ext (weak Δ))) W)
+    ≡ subst (extss (Δ , C , D) (substZero V)) (rename (weak (Δ , C , D)) W)
+dsvZ2 Δ {C} {D} V W =
+  ≡begin
+    subst (exts (exts (extss Δ _))) (rename (ext (ext (weak Δ))) W)
+  ≡⟨ cong (subst _) (cong-rename (cong-ext (ext-weak Δ)) W) ⟩
+    subst (exts (exts (extss Δ _))) (rename (ext (weak (Δ , C))) W)
+  ≡⟨ cong (subst _) (cong-rename (ext-weak (Δ , C)) W) ⟩
+    subst (exts (exts (extss Δ _))) (rename (weak (Δ , C , D)) W)
+  ≡⟨ cong-subst (cong-exts (exts-extss Δ _)) (rename (weak (Δ , C , D)) W)  ⟩
+    subst (exts (extss (Δ , C) _)) (rename (weak (Δ , C , D)) W)
+  ≡⟨ cong-subst (exts-extss (Δ , C) _) (rename (weak (Δ , C , D)) W) ⟩
+    subst (extss (Δ , C , D) (substZero V)) (rename (weak (Δ , C , D)) W)
+  ≡∎
+
+dsvZ : ∀ {Γ A B} (Δ : Context) (V : Γ ⊢ A) (W : Γ ++ Δ ⊢ B)
+  → subst (extss Δ (substZero V)) (rename (weak Δ) W) ≡ W
+dsvZ Δ V (` x) = extss-substZero-weak Δ V x
+dsvZ Δ V (ƛ W)
+  rewrite dsvZ1 Δ V W | dsvZ (Δ , _) V W = refl
+dsvZ Δ V (M · N)
+  rewrite dsvZ Δ V M | dsvZ Δ V N = refl
+dsvZ Δ V `zero = refl
+dsvZ Δ V (`suc W)
+  rewrite dsvZ Δ V W = refl
+dsvZ Δ V (case L M N)
+  rewrite dsvZ Δ V L | dsvZ Δ V M | dsvZ1 Δ V N | dsvZ (Δ , _) V N = refl
+dsvZ Δ V (μ W)
+  rewrite dsvZ1 Δ V W | dsvZ (Δ , _) V W = refl
+dsvZ Δ V (con x) = refl
+dsvZ Δ V (M `* N)
+  rewrite dsvZ Δ V M | dsvZ Δ V N = refl
+dsvZ Δ V (`let M N)
+  rewrite dsvZ Δ V M | dsvZ1 Δ V N | dsvZ (Δ , _) V N = refl
+dsvZ Δ V `⟨ M , N ⟩
+  rewrite dsvZ Δ V M | dsvZ Δ V N = refl
+dsvZ Δ V (`proj₁ W)
+  rewrite dsvZ Δ V W = refl
+dsvZ Δ V (`proj₂ W)
+  rewrite dsvZ Δ V W = refl
+dsvZ Δ V (case× M N)
+  rewrite dsvZ Δ V M | dsvZ2 Δ V N | dsvZ (Δ , _ , _) V N = refl
+dsvZ Δ V (`inj₁ W)
+  rewrite dsvZ Δ V W = refl
+dsvZ Δ V (`inj₂ W)
+  rewrite dsvZ Δ V W = refl
+dsvZ Δ V (case⊎ L M N)
+  rewrite dsvZ Δ V L | dsvZ1 Δ V M | dsvZ (Δ , _) V M | dsvZ1 Δ V N | dsvZ (Δ , _) V N = refl
+dsvZ Δ V `tt = refl
+dsvZ Δ V (case⊤ M N)
+  rewrite dsvZ Δ V M | dsvZ Δ V N = refl
+dsvZ Δ V (case⊥ W)
+  rewrite dsvZ Δ V W = refl
+dsvZ Δ V `[] = refl
+dsvZ Δ V (M `∷ N)
+  rewrite dsvZ Δ V M | dsvZ Δ V N = refl
+dsvZ Δ V (caseL L M N)
+  rewrite dsvZ Δ V L | dsvZ Δ V M | dsvZ2 Δ V N | dsvZ (Δ , _ , _) V N = refl
+
+dsvh1a : ∀ {Γ Γ′} (σ : ∀ {A} → Γ ∋ A → Γ′ ⊢ A) (C : Type) (Δ : Context)
+  → ∀ {A B} (L : Γ ++ Δ , A ⊢ B)
+  → rename (ext (weak Δ {C})) (subst (exts (extss Δ σ)) L)
+    ≡ rename (weak (Δ , A)) (subst (extss (Δ , A) σ) L)
+dsvh1a σ C Δ L =
+  ≡begin
+    rename (ext (weak Δ)) (subst (exts (extss Δ σ)) L)
+  ≡⟨ cong (rename _) (cong-subst (exts-extss Δ σ) L) ⟩
+    rename (ext (weak Δ)) (subst (extss (Δ , _) σ) L)
+  ≡⟨ cong-rename (ext-weak Δ) (subst _ L) ⟩
+    rename (weak (Δ , _)) (subst (extss (Δ , _) σ) L)
+  ≡∎
+
+dsvh1b : ∀ {Γ Γ′} (σ : ∀ {A} → Γ ∋ A → Γ′ ⊢ A) (C : Type) (Δ : Context)
+  → ∀ {A B} (L : Γ ++ Δ , A ⊢ B)
+  → subst (exts (extss Δ (exts σ {C}))) (rename (ext (weak Δ)) L)
+    ≡ subst (extss (Δ , A) (exts σ)) (rename (weak (Δ , A)) L)
+dsvh1b σ C Δ L =
+  ≡begin
+    subst (exts (extss Δ (exts σ))) (rename (ext (weak Δ)) L)
+  ≡⟨ cong (subst _) (cong-rename (ext-weak Δ) L) ⟩
+    subst (exts (extss Δ (exts σ))) (rename (weak (Δ , _)) L)
+  ≡⟨ cong-subst (exts-extss Δ (exts σ)) (rename _ L) ⟩
+    subst (extss (Δ , _) (exts σ)) (rename (weak (Δ , _)) L)
+  ≡∎
+
+dsvh2a : ∀ {Γ Γ′} (σ : ∀ {A} → Γ ∋ A → Γ′ ⊢ A) (D : Type) (Δ : Context)
+  → ∀ {A B C} (L : Γ ++ Δ , A , B ⊢ C)
+  → rename (ext (ext (weak Δ {D}))) (subst (exts (exts (extss Δ σ))) L)
+    ≡ rename (weak (Δ , A , B)) (subst (extss (Δ , A , B) σ) L)
+dsvh2a σ D Δ L =
+  ≡begin
+    rename (ext (ext (weak Δ))) (subst (exts (exts (extss Δ σ))) L)
+  ≡⟨ cong (rename _) (cong-subst (cong-exts (exts-extss Δ σ)) L) ⟩
+    rename (ext (ext (weak Δ))) (subst (exts (extss (Δ , _) σ)) L)
+  ≡⟨ cong (rename _) (cong-subst (exts-extss (Δ , _) σ) L) ⟩
+    rename (ext (ext (weak Δ))) (subst (extss (Δ , _ , _) σ) L)
+  ≡⟨ cong-rename (cong-ext (ext-weak Δ)) _ ⟩
+    rename (ext (weak (Δ , _))) (subst (extss (Δ , _ , _) σ) L)
+  ≡⟨ cong-rename (ext-weak (Δ , _)) _ ⟩
+    rename (weak (Δ , _ , _)) (subst (extss (Δ , _ , _) σ) L)
+  ≡∎
+
+dsvh2b : ∀ {Γ Γ′} (σ : ∀ {A} → Γ ∋ A → Γ′ ⊢ A) (D : Type) (Δ : Context)
+  → ∀ {A B C} (L : Γ ++ Δ , A , B ⊢ C)
+  → subst (exts (exts (extss Δ (exts σ {D})))) (rename (ext (ext (weak Δ))) L)
+    ≡ subst (extss (Δ , A , B) (exts σ)) (rename (weak (Δ , A , B)) L)
+dsvh2b σ D Δ L =
+  ≡begin
+    subst (exts (exts (extss Δ (exts σ)))) (rename (ext (ext (weak Δ))) L)
+  ≡⟨ cong (subst _) (cong-rename (cong-ext (ext-weak Δ)) L) ⟩
+    subst (exts (exts (extss Δ (exts σ)))) (rename (ext (weak (Δ , _))) L)
+  ≡⟨ cong (subst _) (cong-rename (ext-weak (Δ , _)) L)⟩
+    subst (exts (exts (extss Δ (exts σ)))) (rename (weak (Δ , _ , _)) L)
+  ≡⟨ cong-subst (cong-exts (exts-extss Δ (exts σ))) (rename (weak (Δ , _ , _)) L) ⟩
+    subst (exts (extss (Δ , _) (exts σ))) (rename (weak (Δ , _ , _)) L)
+  ≡⟨ cong-subst (exts-extss (Δ , _) (exts σ)) (rename (weak (Δ , _ , _)) L) ⟩
+    subst (extss (Δ , _ , _) (exts σ)) (rename (weak (Δ , _ , _)) L)
+  ≡∎
+
+dsvh : ∀ {Γ Γ′} (σ : ∀ {A} → Γ ∋ A → Γ′ ⊢ A) (B : Type)
+  → ∀ (Δ : Context) {A} (L : Γ ++ Δ ⊢ A)
+  → rename (weak Δ) (subst (extss Δ σ) L)
+    ≡ subst (extss Δ (exts σ {B})) (rename (weak Δ) L)
+dsvh σ B Δ (` x) = rename-weak-extss≡extss-exts-weak σ B Δ x
+dsvh σ B Δ (ƛ_ L)
+  rewrite dsvh1a σ B Δ L | dsvh σ B (Δ , _) L | dsvh1b σ B Δ L = refl
+dsvh σ B Δ (M · N)
+  rewrite dsvh σ B Δ M | dsvh σ B Δ N = refl
+dsvh σ B Δ `zero = refl
+dsvh σ B Δ (`suc L)
+  rewrite dsvh σ B Δ L = refl
+dsvh σ B Δ (case L M N)
+  rewrite dsvh σ B Δ L | dsvh σ B Δ M
+  | dsvh1a σ B Δ N | dsvh σ B (Δ , _) N | dsvh1b σ B Δ N
+  = refl
+dsvh σ B Δ (μ L)
+  rewrite dsvh1a σ B Δ L | dsvh σ B (Δ , _) L | dsvh1b σ B Δ L = refl
+dsvh σ B Δ (con x) = refl
+dsvh σ B Δ (M `* N)
+  rewrite dsvh σ B Δ M | dsvh σ B Δ N = refl
+dsvh σ B Δ (`let M N)
+  rewrite dsvh σ B Δ M | dsvh1a σ B Δ N | dsvh σ B (Δ , _) N | dsvh1b σ B Δ N = refl
+dsvh σ B Δ `⟨ M , N ⟩
+  rewrite dsvh σ B Δ M | dsvh σ B Δ N = refl
+dsvh σ B Δ (`proj₁ L)
+  rewrite dsvh σ B Δ L = refl
+dsvh σ B Δ (`proj₂ L)
+  rewrite dsvh σ B Δ L = refl
+dsvh σ B Δ (case× M N)
+  rewrite dsvh σ B Δ M | dsvh2a σ B Δ N | dsvh σ B (Δ , _ , _) N | dsvh2b σ B Δ N = refl
+dsvh σ B Δ (`inj₁ L)
+  rewrite dsvh σ B Δ L = refl
+dsvh σ B Δ (`inj₂ L)
+  rewrite dsvh σ B Δ L = refl
+dsvh σ B Δ (case⊎ L M N)
+  rewrite dsvh σ B Δ L
+  | dsvh1a σ B Δ M | dsvh σ B (Δ , _) M | dsvh1b σ B Δ M
+  | dsvh1a σ B Δ N | dsvh σ B (Δ , _) N | dsvh1b σ B Δ N
+  = refl
+dsvh σ B Δ `tt = refl
+dsvh σ B Δ (case⊤ M N)
+  rewrite dsvh σ B Δ M | dsvh σ B Δ N = refl
+dsvh σ B Δ (case⊥ L)
+  rewrite dsvh σ B Δ L = refl
+dsvh σ B Δ `[] = refl
+dsvh σ B Δ (M `∷ N)
+  rewrite dsvh σ B Δ M | dsvh σ B Δ N = refl
+dsvh σ B Δ (caseL L M N)
+  rewrite dsvh σ B Δ L | dsvh σ B Δ M
+  | dsvh2a σ B Δ N | dsvh σ B (Δ , _ , _) N | dsvh2b σ B Δ N
+  = refl
+
+dsv : ∀ {Γ A B C} (Δ : Context) (V : Γ ⊢ A) (W : Γ ⊢ B) (x : (Γ , A , B) ++ Δ ∋ C)
+  → extss Δ (subst01 V W) x
+    ≡ subst (extss Δ (substZero V)) (extss Δ (substZero (rename S_ W)) x)
+dsv ∅ V W Z = sym (dsvZ ∅ V W)
+dsv ∅ V W (S Z) = refl
+dsv ∅ V W (S (S x)) = refl
+dsv (Δ , D) V W Z = refl
+dsv (Δ , D) V W (S x)
+  rewrite dsv Δ V W x
+  | dsvh (extss Δ (substZero V)) D ∅ (extss Δ (substZero (rename S_ W)) x)
+  = cong-subst (exts-extss Δ (substZero V)) (rename S_ (extss Δ (substZero (rename S_ W)) x))
+
+ds1a : ∀ {Γ A B C} (Δ : Context) {D}
+  → ∀ (V : Γ ⊢ A) (W : Γ ⊢ B) (N : (Γ , A , B) ++ Δ , D ⊢ C)
+  → subst (exts (extss Δ (subst01 V W))) N ≡ subst (extss (Δ , D) (subst01 V W)) N
+ds1a Δ V W N = cong-subst (exts-extss Δ (subst01 V W)) N
+
+ds1b : ∀ {Γ A B C} (Δ : Context) {D}
+  → ∀ (V : Γ ⊢ A) (W : Γ ⊢ B) (N : (Γ , A , B) ++ Δ , D ⊢ C)
+  → subst (exts (extss Δ (substZero V))) (subst (exts (extss Δ (substZero (rename S_ W)))) N)
+    ≡ subst (extss (Δ , D) (substZero V)) (subst (extss (Δ , D) (substZero (rename S_ W))) N)
+ds1b Δ {D} V W N =
+  ≡begin
+    subst (exts (extss Δ _)) (subst (exts (extss Δ _)) N)
+      ≡⟨ cong (subst _) (cong-subst (exts-extss Δ _) N) ⟩
+    subst (exts (extss Δ _)) (subst (extss (Δ , D) _) N)
+      ≡⟨ cong-subst (exts-extss Δ _) (subst (extss (Δ , D) _) N) ⟩
+    subst (extss (Δ , D) _) (subst (extss (Δ , D) _) N)
+  ≡∎
+
+ds2a : ∀ {Γ A B C} (Δ : Context) {D E}
+  → ∀ (V : Γ ⊢ A) (W : Γ ⊢ B) (N : (Γ , A , B) ++ Δ , D , E ⊢ C)
+  → subst (exts (exts (extss Δ (subst01 V W)))) N
+    ≡ subst (extss (Δ , D , E) (subst01 V W)) N
+ds2a Δ {D} {E} V W N = cong-subst (λ x →
+    ≡begin
+      exts (exts (extss Δ _)) x
+    ≡⟨ cong-exts (exts-extss Δ _) x ⟩
+      exts (extss (Δ , D) _) x
+    ≡⟨ exts-extss (Δ , D) _ x ⟩
+      extss (Δ , D , E) _ x
+    ≡∎
+  ) N
+
+ds2b : ∀ {Γ A B C} (Δ : Context) {D E}
+  → ∀ (V : Γ ⊢ A) (W : Γ ⊢ B) (N : (Γ , A , B) ++ Δ , D , E ⊢ C)
+  → subst (exts (exts (extss Δ (substZero V))))
+      (subst (exts (exts (extss Δ (substZero (rename S_ W))))) N)
+    ≡ subst (extss (Δ , D , E) (substZero V))
+      (subst (extss (Δ , D , E) (substZero (rename S_ W))) N)
+ds2b Δ {D} {E} V W N =
+  ≡begin
+    subst (exts (exts (extss Δ _))) (subst (exts (exts (extss Δ _))) N)
+  ≡⟨ cong (subst _) (cong-subst (cong-exts (exts-extss Δ _)) N) ⟩
+    subst (exts (exts (extss Δ _))) (subst (exts (extss (Δ , D) _)) N)
+  ≡⟨ cong (subst _) (cong-subst (exts-extss (Δ , D) _) N) ⟩
+    subst (exts (exts (extss Δ _))) (subst (extss (Δ , D , E) _) N)
+  ≡⟨ cong-subst (cong-exts (exts-extss Δ _)) (subst (extss (Δ , D , E) _) N) ⟩
+    subst (exts (extss (Δ , D) _)) (subst (extss (Δ , D , E) _) N)
+  ≡⟨ cong-subst (exts-extss (Δ , D) _) (subst (extss (Δ , D , E) _) N) ⟩
+    subst (extss (Δ , D , E) _) (subst (extss (Δ , D , E) _) N)
+  ≡∎
+
+ds : ∀ {Γ A B C} (Δ : Context) (V : Γ ⊢ A) (W : Γ ⊢ B) (N : (Γ , A , B) ++ Δ ⊢ C)
+  → subst (extss Δ (subst01 V W)) N
+    ≡ subst (extss Δ (substZero V)) (subst (extss Δ (substZero (rename S_ W))) N)
+ds Δ V W (` x) = dsv Δ V W x
+ds Δ V W (ƛ N)
+  rewrite ds1a Δ V W N | ds (Δ , _) V W N | ds1b Δ V W N = refl
+ds Δ V W (M · N)
+  rewrite ds Δ V W M | ds Δ V W N = refl
+ds Δ V W `zero = refl
+ds Δ V W (`suc N)
+  rewrite ds Δ V W N = refl
+ds Δ V W (case L M N)
+  rewrite ds Δ V W L | ds Δ V W M | ds1a Δ V W N | ds (Δ , _) V W N | ds1b Δ V W N = refl
+ds Δ V W (μ N)
+  rewrite ds1a Δ V W N | ds (Δ , _) V W N | ds1b Δ V W N = refl
+ds Δ V W (con x) = refl
+ds Δ V W (M `* N)
+  rewrite ds Δ V W M | ds Δ V W N = refl
+ds Δ V W (`let M N)
+  rewrite ds Δ V W M | ds1a Δ V W N | ds (Δ , _) V W N | ds1b Δ V W N = refl
+ds Δ V W `⟨ M , N ⟩
+  rewrite ds Δ V W M | ds Δ V W N = refl
+ds Δ V W (`proj₁ N)
+  rewrite ds Δ V W N = refl
+ds Δ V W (`proj₂ N)
+  rewrite ds Δ V W N = refl
+ds Δ V W (case× M N)
+  rewrite ds Δ V W M | ds2a Δ V W N | ds (Δ , _ , _) V W N | ds2b Δ V W N = refl
+ds Δ V W (`inj₁ N)
+  rewrite ds Δ V W N = refl
+ds Δ V W (`inj₂ N)
+  rewrite ds Δ V W N = refl
+ds Δ V W (case⊎ L M N)
+  rewrite ds Δ V W L
+  | ds1a Δ V W M | ds (Δ , _) V W M | ds1b Δ V W M
+  | ds1a Δ V W N | ds (Δ , _) V W N | ds1b Δ V W N
+  = refl
+ds Δ V W `tt = refl
+ds Δ V W (case⊤ M N)
+  rewrite ds Δ V W M | ds Δ V W N = refl
+ds Δ V W (case⊥ N)
+  rewrite ds Δ V W N = refl
+ds Δ V W `[] = refl
+ds Δ V W (M `∷ N)
+  rewrite ds Δ V W M | ds Δ V W N = refl
+ds Δ V W (caseL L M N)
+  rewrite ds Δ V W L | ds Δ V W M | ds2a Δ V W N | ds (Δ , _ , _) V W N | ds2b Δ V W N = refl
+
+double-subst {Γ} {A} {B} {C} {V} {W} {N} =
+  ≡begin
+    N [ V ][ W ]
+  ≡⟨ helper ⟩
+    subst (subst01 V W) N
+  ≡⟨ ds ∅ V W N ⟩
+    subst (substZero V) (subst (substZero (rename S_ W)) N)
+  ≡⟨⟩
+    (N [ rename S_ W ]) [ V ]
+  ≡∎
+  where
+  helper : N [ V ][ W ] ≡ subst (subst01 V W) N
+  helper = cong-subst (λ{ Z → refl ; (S Z) → refl ; (S (S x)) → refl }) N
 ```
 
 ## Test examples
